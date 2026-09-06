@@ -1,16 +1,64 @@
+use core::time;
 use std::{
     env::home_dir,
     fs::{self},
     io,
     path::{Path, PathBuf},
+    time::Duration,
 };
 
-use color_eyre::eyre::Context;
+use color_eyre::eyre::{Context, ContextCompat};
+use lofty::{
+    file::{AudioFile, TaggedFileExt},
+    tag::Accessor as _,
+};
 
 #[derive(Clone)]
 pub struct Track {
-    pub title: String,
     pub path: PathBuf,
+
+    /// tags
+    pub title: String,
+    pub artist: String,
+    pub length: Duration,
+}
+
+impl Track {
+    pub fn from_path(path: PathBuf) -> Self {
+        let mut title = path
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap_or_else(|| "Unknown Track")
+            .to_string();
+
+        let mut artist = "Unknown Artist".to_string();
+        let mut length = Duration::ZERO;
+
+        if let Ok(tagged_file) = lofty::read_from_path(&path) {
+            let properties = tagged_file.properties();
+            length = properties.duration();
+
+            if let Some(tag) = tagged_file
+                .primary_tag()
+                .or_else(|| tagged_file.first_tag())
+            {
+                if let Some(t) = tag.title().as_deref() {
+                    title = t.to_string();
+                }
+                if let Some(a) = tag.artist().as_deref() {
+                    artist = a.to_string()
+                }
+            }
+        }
+
+        Self {
+            path,
+            title,
+            artist,
+            length,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -31,18 +79,7 @@ impl LibraryState {
 
         self.tracks = files
             .into_iter()
-            .map(|path| {
-                let file_name = path
-                    .file_name()
-                    .unwrap()
-                    .to_str()
-                    .unwrap();
-
-                Track {
-                    title: file_name.to_string(),
-                    path,
-                }
-            })
+            .map(|path| -> Track { Track::from_path(path) })
             .collect();
 
         Ok(())

@@ -11,16 +11,16 @@ pub struct TransportState {}
 
 impl TransportState {
     pub fn render(&self, current_track: Option<&Track>, area: Rect, buf: &mut Buffer) {
-        let song_title = match current_track {
-            Some(track) => track.title.as_str(),
-            None => "No track playing",
+        let song_playing_display = match current_track {
+            Some(track) => format!("{} - {}", track.artist, track.title),
+            None => "No track playing".to_string(),
         };
 
         let block = Block::default().borders(Borders::TOP);
         let inner = block.inner(area);
         block.render(area, buf);
 
-        let paragraph = Paragraph::new(song_title);
+        let paragraph = Paragraph::new(song_playing_display);
         paragraph.render(inner, buf);
     }
 }

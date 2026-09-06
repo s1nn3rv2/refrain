@@ -6,5 +6,6 @@ edition = "2024"
 [dependencies]
 color-eyre = "0.6.5"
 crossterm = "0.29.0"
+lofty = "0.25.1"
 ratatui = "0.30.2"
 rodio = "0.22.2"
