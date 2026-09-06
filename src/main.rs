@@ -1,6 +1,9 @@
 mod audio;
 mod library;
 mod ui;
+mod util;
+
+use std::time::Duration;
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
@@ -49,20 +52,19 @@ impl App {
         self.library_widget
             .render(&self.library, main_area, frame.buffer_mut());
 
-        self.transport.render(
-            self.player.current_track(),
-            transport_area,
-            frame.buffer_mut(),
-        );
+        self.transport
+            .render(&self.player, transport_area, frame.buffer_mut());
     }
 
     fn handle_events(&mut self) -> color_eyre::Result<()> {
-        match event::read()? {
-            Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                self.handle_key_event(key_event)
-            },
-            _ => {},
-        };
+        if event::poll(Duration::from_millis(250))? {
+            match event::read()? {
+                Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
+                    self.handle_key_event(key_event)
+                },
+                _ => {},
+            }
+        }
         Ok(())
     }
 

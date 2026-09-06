@@ -1,4 +1,4 @@
-use std::{fs::File, io::BufReader};
+use std::{fs::File, io::BufReader, time::Duration};
 
 use color_eyre::eyre::Context;
 use rodio::{Decoder, DeviceSinkBuilder, MixerDeviceSink, Player};
@@ -53,5 +53,9 @@ impl AudioPlayer {
 
     pub fn current_track(&self) -> Option<&Track> {
         self.current_track.as_ref()
+    }
+
+    pub fn elapsed(&self) -> Duration {
+        self.player.get_pos()
     }
 }
