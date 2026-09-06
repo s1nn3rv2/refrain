@@ -18,7 +18,7 @@ pub struct Track {
 
     /// tags
     pub title: String,
-    pub artist: String,
+    artists: String, // can have multiple, separated by a symbol (like ;)
     pub length: Duration,
 }
 
@@ -31,7 +31,7 @@ impl Track {
             .unwrap_or("Unknown Track")
             .to_string();
 
-        let mut artist = "Unknown Artist".to_string();
+        let mut artists = "Unknown Artist".to_string();
         let mut length = Duration::ZERO;
 
         if let Ok(tagged_file) = lofty::read_from_path(&path) {
@@ -46,7 +46,7 @@ impl Track {
                     title = t.to_string();
                 }
                 if let Some(a) = tag.artist().as_deref() {
-                    artist = a.to_string()
+                    artists = a.to_string()
                 }
             }
         }
@@ -54,9 +54,21 @@ impl Track {
         Self {
             path,
             title,
-            artist,
+            artists,
             length,
         }
+    }
+
+    pub fn artists(&self) -> Vec<&str> {
+        self.artists
+            .split(';')
+            .map(|s| s.trim()) // remove any remaining whitespaces, so "Artist1; Artist2" and "Artist1;Artist2" behave the same
+            .collect()
+    }
+
+    /// Formatted as "Artist 1, Artist 2, Artist 3"
+    pub fn formatted_artists(&self) -> String {
+        self.artists().join(", ")
     }
 }
 

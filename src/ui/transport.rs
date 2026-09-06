@@ -12,7 +12,7 @@ pub struct TransportState {}
 impl TransportState {
     pub fn render(&self, current_track: Option<&Track>, area: Rect, buf: &mut Buffer) {
         let song_playing_display = match current_track {
-            Some(track) => format!("{} - {}", track.artist, track.title),
+            Some(track) => format!("{} - {}", track.formatted_artists(), track.title),
             None => "No track playing".to_string(),
         };
 

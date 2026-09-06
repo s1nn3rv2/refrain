@@ -45,7 +45,7 @@ impl LibraryWidgetState {
                     format!("{:02}:{:02}", duration_secs / 60, duration_secs % 60);
 
                 Row::new([
-                    Cell::from(track.artist.as_str()),
+                    Cell::from(track.formatted_artists()),
                     Cell::from(track.title.as_str()),
                     Cell::from(duration_display),
                 ])
