@@ -3,12 +3,12 @@ use std::{fs::File, io::BufReader};
 use color_eyre::eyre::Context;
 use rodio::{Decoder, DeviceSinkBuilder, MixerDeviceSink, Player};
 
-use crate::library::{LibraryState, Track};
+use crate::library::Track;
 
 pub struct AudioPlayer {
     _device_sink: MixerDeviceSink,
     player: Player,
-    current_track_index: Option<usize>,
+    current_track: Option<Track>,
 }
 
 impl AudioPlayer {
@@ -21,11 +21,11 @@ impl AudioPlayer {
         Ok(Self {
             _device_sink: device_sink,
             player,
-            current_track_index: None,
+            current_track: None,
         })
     }
 
-    pub fn play(&mut self, index: usize, track: &Track) -> color_eyre::Result<()> {
+    pub fn play(&mut self, track: &Track) -> color_eyre::Result<()> {
         let file = File::open(&track.path)
             .wrap_err_with(|| format!("Failed to open file: {:?}", track.path))?;
         let reader = BufReader::new(file);
@@ -36,12 +36,12 @@ impl AudioPlayer {
         self.player.append(source);
         self.player.play();
 
-        self.current_track_index = Some(index);
+        self.current_track = Some(track.clone());
         Ok(())
     }
 
     pub fn resume_pause(&mut self) {
-        if self.current_track_index.is_none() {
+        if self.current_track.is_none() {
             return;
         }
         if !self.player.is_paused() {
@@ -51,8 +51,7 @@ impl AudioPlayer {
         }
     }
 
-    pub fn current_track<'a>(&self, library: &'a LibraryState) -> Option<&'a Track> {
-        let index = self.current_track_index?;
-        library.tracks.get(index)
+    pub fn current_track(&self) -> Option<&Track> {
+        self.current_track.as_ref()
     }
 }

@@ -7,6 +7,7 @@ use std::{
 
 use color_eyre::eyre::Context;
 
+#[derive(Clone)]
 pub struct Track {
     pub title: String,
     pub path: PathBuf,

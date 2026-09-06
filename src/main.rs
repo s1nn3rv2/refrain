@@ -60,12 +60,11 @@ impl App {
         self.library_widget
             .render(&self.library, main_area, frame.buffer_mut());
 
-        let current_track = self
-            .player
-            .current_track(&self.library);
-
-        self.transport
-            .render(current_track, transport_area, frame.buffer_mut());
+        self.transport.render(
+            self.player.current_track(),
+            transport_area,
+            frame.buffer_mut(),
+        );
     }
 
     fn handle_events(&mut self) -> color_eyre::Result<()> {
@@ -87,7 +86,7 @@ impl App {
                 .handle_key_event(key_event) =>
             {
                 if let Some(track) = self.library.tracks.get(index) {
-                    let _ = self.player.play(index, track);
+                    let _ = self.player.play(track);
                 }
             },
             _ => {},
