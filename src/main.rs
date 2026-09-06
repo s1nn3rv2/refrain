@@ -72,6 +72,9 @@ impl App {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
             KeyCode::Char('p') => self.player.resume_pause(),
+            KeyCode::Char('r') => {
+                let _ = self.library.scan();
+            },
             _ if let Some(index) = self
                 .library_widget
                 .handle_key_event(key_event) =>

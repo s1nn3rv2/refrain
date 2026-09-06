@@ -1,12 +1,10 @@
-use std::time::Duration;
-
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Rect},
-    widgets::{Block, Borders, Paragraph, StatefulWidget, Widget},
+    widgets::{Block, Borders, Paragraph, Widget},
 };
 
-use crate::{audio::AudioPlayer, library::Track, util::DurationExt};
+use crate::{audio::AudioPlayer, util::DurationExt};
 
 #[derive(Default)]
 pub struct TransportState {}

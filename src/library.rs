@@ -1,7 +1,7 @@
 use std::{
     env::home_dir,
-    fs::{self},
-    io,
+    fs::{self, File},
+    io::{self, BufWriter, Write},
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -79,9 +79,68 @@ pub struct LibraryState {
 
 impl LibraryState {
     pub fn new() -> Self {
+        if let Ok(tracks) = Self::load_cache() {
+            return Self { tracks };
+        }
+
+        // if cant load cache (on first startup most likely), scan library first and then save cache
         let mut state = Self::default();
         let _ = state.scan();
+        let _ = state.save_cache();
         state
+    }
+
+    fn cache_path() -> PathBuf {
+        home_dir()
+            .unwrap()
+            .join(".cache/refrain/library.tsv")
+    }
+
+    pub fn cache_exists() -> bool {
+        fs::exists(Self::cache_path()).unwrap_or(false)
+    }
+
+    pub fn save_cache(&self) -> color_eyre::Result<()> {
+        let path = Self::cache_path();
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let file = File::create(path)?;
+        let mut writer = BufWriter::new(file);
+
+        for t in &self.tracks {
+            writeln!(
+                writer,
+                "{}\t{}\t{}\t{}\n",
+                t.path.display(),
+                t.title,
+                t.artists,
+                t.length.as_millis()
+            )?;
+        }
+
+        writer.flush()?;
+        Ok(())
+    }
+
+    pub fn load_cache() -> color_eyre::Result<Vec<Track>> {
+        let content = fs::read_to_string(Self::cache_path())?;
+        let mut tracks = Vec::new();
+
+        for line in content.lines() {
+            let parts: Vec<&str> = line.split('\t').collect();
+            if parts.len() == 4 {
+                let millis: u64 = parts[3].parse().unwrap_or(0);
+                tracks.push(Track {
+                    path: PathBuf::from(parts[0]),
+                    title: parts[1].to_string(),
+                    artists: parts[2].to_string(),
+                    length: Duration::from_millis(millis),
+                })
+            }
+        }
+
+        Ok(tracks)
     }
 
     pub fn scan(&mut self) -> color_eyre::Result<()> {
@@ -92,6 +151,8 @@ impl LibraryState {
             .into_iter()
             .map(|path| -> Track { Track::from_path(path) })
             .collect();
+
+        self.save_cache()?;
 
         Ok(())
     }
