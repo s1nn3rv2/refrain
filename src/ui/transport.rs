@@ -1,18 +1,20 @@
-use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
     widgets::{Block, Borders, Paragraph, Widget},
 };
 
+use crate::library::Track;
+
 #[derive(Default)]
 pub struct TransportState {}
 
-impl TransportState {}
-
-impl Widget for &TransportState {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        let song_title = "test song";
+impl TransportState {
+    pub fn render(&self, current_track: Option<&Track>, area: Rect, buf: &mut Buffer) {
+        let song_title = match current_track {
+            Some(track) => track.title.as_str(),
+            None => "No track playing",
+        };
 
         let block = Block::default().borders(Borders::TOP);
         let inner = block.inner(area);

@@ -59,7 +59,13 @@ impl App {
 
         self.library_widget
             .render(&self.library, main_area, frame.buffer_mut());
-        frame.render_widget(&self.transport, transport_area);
+
+        let current_track = self
+            .player
+            .current_track(&self.library);
+
+        self.transport
+            .render(current_track, transport_area, frame.buffer_mut());
     }
 
     fn handle_events(&mut self) -> color_eyre::Result<()> {
