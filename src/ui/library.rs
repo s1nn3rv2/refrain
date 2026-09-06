@@ -55,11 +55,18 @@ impl LibraryWidgetState {
         StatefulWidget::render(list, area, buf, &mut self.state);
     }
 
-    pub fn handle_key_event(&mut self, key_event: KeyEvent) {
+    pub fn handle_key_event(&mut self, key_event: KeyEvent) -> Option<usize> {
         match key_event.code {
-            KeyCode::Char('j') | KeyCode::Down => self.next(),
-            KeyCode::Char('k') | KeyCode::Up => self.prev(),
-            _ => {},
+            KeyCode::Char('j') | KeyCode::Down => {
+                self.next();
+                None
+            },
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.prev();
+                None
+            },
+            KeyCode::Char('l') | KeyCode::Enter => self.selected(),
+            _ => None,
         }
     }
 }

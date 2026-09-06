@@ -1,27 +1,28 @@
+mod audio;
 mod library;
 mod ui;
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     DefaultTerminal, Frame,
-    buffer::Buffer,
-    layout::{Constraint, Layout, Rect},
+    layout::{Constraint, Layout},
     style::Stylize,
     symbols::border,
     text::Line,
-    widgets::{Block, Widget},
+    widgets::Block,
 };
 
 use crate::{
+    audio::AudioPlayer,
     library::LibraryState,
     ui::{library::LibraryWidgetState, transport::TransportState},
 };
 
-#[derive(Default)]
 pub struct App {
     transport: TransportState,
     library: LibraryState,
     library_widget: LibraryWidgetState,
+    player: AudioPlayer,
     quit: bool,
 }
 
@@ -31,6 +32,7 @@ impl App {
             quit: false,
             library: LibraryState::new(),
             library_widget: LibraryWidgetState::default(),
+            player: AudioPlayer::new().expect("Could not create audio player"),
             transport: TransportState::default(),
         }
     }
@@ -73,9 +75,16 @@ impl App {
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
-            _ => self
+            KeyCode::Char('p') => self.player.resume_pause(),
+            _ if let Some(index) = self
                 .library_widget
-                .handle_key_event(key_event),
+                .handle_key_event(key_event) =>
+            {
+                if let Some(track) = self.library.tracks.get(index) {
+                    let _ = self.player.play(index, track);
+                }
+            },
+            _ => {},
         }
     }
 

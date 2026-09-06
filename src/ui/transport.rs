@@ -1,3 +1,4 @@
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -6,6 +7,8 @@ use ratatui::{
 
 #[derive(Default)]
 pub struct TransportState {}
+
+impl TransportState {}
 
 impl Widget for &TransportState {
     fn render(self, area: Rect, buf: &mut Buffer) {
