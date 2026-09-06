@@ -111,7 +111,7 @@ impl LibraryState {
         for t in &self.tracks {
             writeln!(
                 writer,
-                "{}\t{}\t{}\t{}\n",
+                "{}\t{}\t{}\t{}",
                 t.path.display(),
                 t.title,
                 t.artists,
