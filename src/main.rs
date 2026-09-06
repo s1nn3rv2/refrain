@@ -84,10 +84,6 @@ impl App {
     }
 }
 
-impl Widget for &App {
-    fn render(self, area: Rect, buf: &mut Buffer) {}
-}
-
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
 

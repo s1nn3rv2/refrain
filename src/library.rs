@@ -5,6 +5,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use color_eyre::eyre::Context;
+
 pub struct Track {
     pub title: String,
     pub path: PathBuf,
@@ -22,9 +24,9 @@ impl LibraryState {
         state
     }
 
-    pub fn scan(&mut self) -> io::Result<()> {
+    pub fn scan(&mut self) -> color_eyre::Result<()> {
         let music_path = home_dir().unwrap().join("Music");
-        let files = visit_dirs(&music_path)?;
+        let files = visit_dirs(&music_path).wrap_err("Failed to scan music directory")?;
 
         self.tracks = files
             .into_iter()
