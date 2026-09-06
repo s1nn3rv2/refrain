@@ -1,20 +1,21 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     buffer::Buffer,
-    layout::Rect,
+    layout::{Constraint, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, List, ListItem, ListState, StatefulWidget, Widget},
+    symbols::border,
+    widgets::{Block, Cell, Row, StatefulWidget, Table, TableState},
 };
 
 use crate::library::LibraryState;
 
 pub struct LibraryWidgetState {
-    pub state: ListState,
+    pub state: TableState,
 }
 
 impl Default for LibraryWidgetState {
     fn default() -> Self {
-        let mut state = ListState::default();
+        let mut state = TableState::default();
         state.select(Some(0));
         Self { state }
     }
@@ -34,25 +35,45 @@ impl LibraryWidgetState {
     }
 
     pub fn render(&mut self, library: &LibraryState, area: Rect, buf: &mut Buffer) {
-        let items: Vec<ListItem> = library
+        let header = Row::new(["Artists", "Title", "Length"]).style(Style::new().bold());
+        let rows: Vec<Row> = library
             .tracks
             .iter()
-            .map(|track| ListItem::new(track.title.as_str()))
+            .map(|track| {
+                let duration_secs = track.length.as_secs();
+                let duration_display =
+                    format!("{:02}:{:02}", duration_secs / 60, duration_secs % 60);
+
+                Row::new([
+                    Cell::from(track.artist.as_str()),
+                    Cell::from(track.title.as_str()),
+                    Cell::from(duration_display),
+                ])
+            })
             .collect();
-        let list = List::new(items)
+
+        let widths = [
+            Constraint::Percentage(30),
+            Constraint::Percentage(50),
+            Constraint::Percentage(20),
+        ];
+
+        let table = Table::new(rows, widths)
+            .header(header)
             .block(
-                Block::default()
-                    .title("Library")
-                    .borders(Borders::ALL),
+                Block::bordered()
+                    .title(" Library ")
+                    .border_set(border::THICK),
             )
-            .highlight_symbol("> ")
-            .highlight_style(
+            .column_spacing(1)
+            .row_highlight_style(
                 Style::default()
                     .fg(Color::Cyan)
                     .add_modifier(Modifier::BOLD),
-            );
+            )
+            .highlight_symbol("> ");
 
-        StatefulWidget::render(list, area, buf, &mut self.state);
+        StatefulWidget::render(table, area, buf, &mut self.state);
     }
 
     pub fn handle_key_event(&mut self, key_event: KeyEvent) -> Option<usize> {

@@ -1,4 +1,3 @@
-use core::time;
 use std::{
     env::home_dir,
     fs::{self},
@@ -7,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use color_eyre::eyre::{Context, ContextCompat};
+use color_eyre::eyre::Context;
 use lofty::{
     file::{AudioFile, TaggedFileExt},
     tag::Accessor as _,
@@ -29,7 +28,7 @@ impl Track {
             .file_name()
             .unwrap()
             .to_str()
-            .unwrap_or_else(|| "Unknown Track")
+            .unwrap_or("Unknown Track")
             .to_string();
 
         let mut artist = "Unknown Artist".to_string();

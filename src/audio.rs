@@ -16,7 +16,7 @@ impl AudioPlayer {
         let device_sink = DeviceSinkBuilder::open_default_sink()
             .map_err(|e| color_eyre::eyre::eyre!("Failed to open audio device: {e}"))?;
 
-        let player = Player::connect_new(&device_sink.mixer());
+        let player = Player::connect_new(device_sink.mixer());
 
         Ok(Self {
             _device_sink: device_sink,

@@ -6,10 +6,6 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     DefaultTerminal, Frame,
     layout::{Constraint, Layout},
-    style::Stylize,
-    symbols::border,
-    text::Line,
-    widgets::Block,
 };
 
 use crate::{
@@ -49,13 +45,6 @@ impl App {
     fn draw(&mut self, frame: &mut Frame) {
         let [main_area, transport_area] =
             Layout::vertical([Constraint::Fill(1), Constraint::Length(3)]).areas(frame.area());
-
-        let title = Line::from(" Test ".bold());
-        let block = Block::bordered()
-            .title(title.centered())
-            .border_set(border::THICK);
-
-        frame.render_widget(block, main_area);
 
         self.library_widget
             .render(&self.library, main_area, frame.buffer_mut());
