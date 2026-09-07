@@ -5,7 +5,11 @@ mod ui;
 mod util;
 mod waveform;
 
-use std::time::Duration;
+use std::{
+    sync::mpsc::{self, Receiver, RecvTimeoutError},
+    thread,
+    time::Duration,
+};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
@@ -16,7 +20,7 @@ use ratatui::{
 use crate::{
     audio::AudioPlayer,
     library::LibraryState,
-    task::{TaskManager, TaskResult},
+    task::TaskManager,
     ui::{
         input::{InputAction, TextInput},
         library::LibraryWidget,
@@ -30,6 +34,11 @@ pub enum ActiveView {
     Search,
 }
 
+pub enum AppEvent {
+    Input(Event),
+    Waveform(usize, Box<WaveformData>), // box for clippy warning about large size difference
+}
+
 pub struct App {
     active_view: ActiveView,
     transport: TransportState,
@@ -39,13 +48,33 @@ pub struct App {
     search: TextInput,
     tasks: TaskManager,
     waveform: Option<WaveformData>,
+    events: Receiver<AppEvent>,
     quit: bool,
 }
 
 impl App {
+    /// we use it only for elapsed time (and playhead)
+    const TICK: Duration = Duration::from_millis(250);
+
     fn new() -> Self {
         let library = LibraryState::new();
         let library_widget = LibraryWidget::new(&library);
+
+        // terminal gets its own thread, so main loop can block on a single channel and wake on
+        // keypress or finished task
+        let (events_tx, events_rx) = mpsc::channel();
+
+        let input_tx = events_tx.clone();
+        thread::spawn(move || {
+            while let Ok(event) = event::read() {
+                if input_tx
+                    .send(AppEvent::Input(event))
+                    .is_err()
+                {
+                    break;
+                }
+            }
+        });
 
         Self {
             active_view: ActiveView::Main,
@@ -54,7 +83,8 @@ impl App {
             library_widget,
             player: AudioPlayer::new().expect("Could not create audio player"),
             search: TextInput::new("Search", "Press '/' to search..."),
-            tasks: TaskManager::new(),
+            tasks: TaskManager::new(events_tx),
+            events: events_rx,
             waveform: None,
             transport: TransportState::default(),
         }
@@ -62,14 +92,21 @@ impl App {
 
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> color_eyre::Result<()> {
         while !self.quit {
-            for result in self.tasks.poll() {
-                match result {
-                    TaskResult::Waveform(data) => self.waveform = Some(data),
-                }
-            }
-
             terminal.draw(|frame| self.draw(frame))?;
-            self.handle_events()?;
+
+            match self
+                .events
+                .recv_timeout(Self::TICK)
+            {
+                Ok(AppEvent::Input(event)) => self.handle_event(event),
+                Ok(AppEvent::Waveform(generation, data)) => {
+                    if self.tasks.is_current(generation) {
+                        self.waveform = Some(*data);
+                    }
+                },
+                Err(RecvTimeoutError::Timeout) => {},
+                Err(RecvTimeoutError::Disconnected) => self.quit = true,
+            }
         }
 
         Ok(())
@@ -97,16 +134,12 @@ impl App {
         );
     }
 
-    fn handle_events(&mut self) -> color_eyre::Result<()> {
-        if event::poll(Duration::from_millis(250))? {
-            match event::read()? {
-                Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                    self.handle_key_event(key_event)
-                },
-                _ => {},
-            }
+    fn handle_event(&mut self, event: Event) {
+        if let Event::Key(key_event) = event
+            && key_event.kind == KeyEventKind::Press
+        {
+            self.handle_key_event(key_event);
         }
-        Ok(())
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {

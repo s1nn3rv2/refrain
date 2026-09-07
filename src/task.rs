@@ -3,29 +3,26 @@ use std::{
     sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
-        mpsc::{self, Receiver, Sender},
+        mpsc::{self, Sender},
     },
     thread,
 };
 
-use crate::waveform::{self, WaveformData};
-
-pub enum TaskResult {
-    Waveform(WaveformData),
-}
+use crate::{
+    AppEvent,
+    waveform::{self},
+};
 
 type Request = (PathBuf, usize);
 
 pub struct TaskManager {
     req_tx: Sender<Request>,
-    res_rx: Receiver<(usize, TaskResult)>,
     generation: Arc<AtomicUsize>,
 }
 
 impl TaskManager {
-    pub fn new() -> Self {
+    pub fn new(events_tx: Sender<AppEvent>) -> Self {
         let (req_tx, req_rx) = mpsc::channel::<Request>();
-        let (res_tx, res_rx) = mpsc::channel::<(usize, TaskResult)>();
 
         let generation = Arc::new(AtomicUsize::new(0));
         let current = Arc::clone(&generation);
@@ -48,16 +45,12 @@ impl TaskManager {
 
                 // decoding could take a while, so check again before sending it
                 if generation == current.load(Ordering::Relaxed) {
-                    let _ = res_tx.send((generation, TaskResult::Waveform(data)));
+                    let _ = events_tx.send(AppEvent::Waveform(generation, Box::new(data)));
                 }
             }
         });
 
-        Self {
-            req_tx,
-            res_rx,
-            generation,
-        }
+        Self { req_tx, generation }
     }
 
     pub fn set_track(&self, path: &Path) {
@@ -71,16 +64,10 @@ impl TaskManager {
             .send((path.to_path_buf(), generation));
     }
 
-    // everything that finished since last frame (doesnt include tracks that user has skipped past)
-    pub fn poll(&self) -> Vec<TaskResult> {
-        let current = self
-            .generation
-            .load(Ordering::Relaxed);
-
-        self.res_rx
-            .try_iter()
-            .filter(|(generation, _)| *generation == current)
-            .map(|(_, result)| result)
-            .collect()
+    pub fn is_current(&self, generation: usize) -> bool {
+        generation
+            == self
+                .generation
+                .load(Ordering::Relaxed)
     }
 }
