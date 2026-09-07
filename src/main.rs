@@ -14,24 +14,40 @@ use ratatui::{
 use crate::{
     audio::AudioPlayer,
     library::LibraryState,
-    ui::{library::LibraryWidgetState, transport::TransportState},
+    ui::{
+        input::{InputAction, TextInput},
+        library::LibraryWidgetState,
+        transport::TransportState,
+    },
 };
 
+pub enum ActiveView {
+    Main,
+    Search,
+}
+
 pub struct App {
+    active_view: ActiveView,
     transport: TransportState,
     library: LibraryState,
     library_widget: LibraryWidgetState,
     player: AudioPlayer,
+    search: TextInput,
     quit: bool,
 }
 
 impl App {
     fn new() -> Self {
+        let library = LibraryState::new();
+        let library_widget = LibraryWidgetState::new(&library);
+
         Self {
+            active_view: ActiveView::Main,
             quit: false,
-            library: LibraryState::new(),
-            library_widget: LibraryWidgetState::default(),
+            library,
+            library_widget,
             player: AudioPlayer::new().expect("Could not create audio player"),
+            search: TextInput::new("Search", "Press '/' to search..."),
             transport: TransportState::default(),
         }
     }
@@ -46,8 +62,15 @@ impl App {
     }
 
     fn draw(&mut self, frame: &mut Frame) {
-        let [main_area, transport_area] =
-            Layout::vertical([Constraint::Fill(1), Constraint::Length(3)]).areas(frame.area());
+        let [search_area, main_area, transport_area] = Layout::vertical([
+            Constraint::Length(1),
+            Constraint::Fill(1),
+            Constraint::Length(3),
+        ])
+        .areas(frame.area());
+
+        self.search
+            .render(frame, search_area);
 
         self.library_widget
             .render(&self.library, main_area, frame.buffer_mut());
@@ -69,21 +92,46 @@ impl App {
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
-        match key_event.code {
-            KeyCode::Char('q') => self.exit(),
-            KeyCode::Char('p') => self.player.resume_pause(),
-            KeyCode::Char('r') => {
-                let _ = self.library.scan();
-            },
-            _ if let Some(index) = self
-                .library_widget
-                .handle_key_event(key_event) =>
-            {
-                if let Some(track) = self.library.tracks.get(index) {
-                    let _ = self.player.play(track);
+        match self.active_view {
+            ActiveView::Search => {
+                match self
+                    .search
+                    .handle_key_event(key_event)
+                {
+                    InputAction::Changed => {
+                        // filter tracks
+                        self.library_widget
+                            .update_filter(&self.library, &self.search.value);
+                    },
+                    InputAction::Submitted | InputAction::Escaped => {
+                        // go back to main view
+                        self.active_view = ActiveView::Main
+                    },
+                    _ => {},
                 }
             },
-            _ => {},
+            ActiveView::Main => match key_event.code {
+                KeyCode::Char('q') => self.exit(),
+                KeyCode::Char('p') => self.player.resume_pause(),
+                KeyCode::Char('r') => {
+                    let _ = self.library.scan();
+                    self.library_widget
+                        .update_filter(&self.library, &self.search.value);
+                },
+                KeyCode::Char('/') => {
+                    self.active_view = ActiveView::Search;
+                    self.search.focus();
+                },
+                _ if let Some(index) = self
+                    .library_widget
+                    .handle_key_event(key_event) =>
+                {
+                    if let Some(track) = self.library.tracks.get(index) {
+                        let _ = self.player.play(track);
+                    }
+                },
+                _ => {},
+            },
         }
     }
 

@@ -51,6 +51,9 @@ impl Track {
             }
         }
 
+        // We do not keep it in search memory, it has derived fields and is cheap to build so no
+        // need to keep it in cache, although in future perhaps we could make it be in cache for
+        // faster loading? we'll see
         Self {
             path,
             title,
@@ -59,16 +62,23 @@ impl Track {
         }
     }
 
-    pub fn artists(&self) -> Vec<&str> {
-        self.artists
-            .split(';')
+    /// Returns artists in a nice format ("Artist1;Artist2" -> "Artist1, Artist2")
+    pub fn format_artists(raw: &str) -> String {
+        raw.split(';')
             .map(|s| s.trim()) // remove any remaining whitespaces, so "Artist1; Artist2" and "Artist1;Artist2" behave the same
-            .collect()
+            .collect::<Vec<_>>()
+            .join(", ")
     }
 
     /// Formatted as "Artist 1, Artist 2, Artist 3"
     pub fn formatted_artists(&self) -> String {
-        self.artists().join(", ")
+        Self::format_artists(&self.artists)
+    }
+
+    /// Returns a search haystack string, containing all searchable fields
+    pub fn write_search_haystack(&self, out: &mut String) {
+        use std::fmt::Write as _;
+        let _ = write!(out, "{} {}", self.title, self.formatted_artists());
     }
 }
 
