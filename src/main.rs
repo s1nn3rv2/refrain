@@ -1,7 +1,9 @@
 mod audio;
 mod library;
+mod task;
 mod ui;
 mod util;
+mod waveform;
 
 use std::time::Duration;
 
@@ -14,11 +16,13 @@ use ratatui::{
 use crate::{
     audio::AudioPlayer,
     library::LibraryState,
+    task::{TaskManager, TaskResult},
     ui::{
         input::{InputAction, TextInput},
-        library::LibraryWidgetState,
+        library::LibraryWidget,
         transport::TransportState,
     },
+    waveform::WaveformData,
 };
 
 pub enum ActiveView {
@@ -30,16 +34,18 @@ pub struct App {
     active_view: ActiveView,
     transport: TransportState,
     library: LibraryState,
-    library_widget: LibraryWidgetState,
+    library_widget: LibraryWidget,
     player: AudioPlayer,
     search: TextInput,
+    tasks: TaskManager,
+    waveform: Option<WaveformData>,
     quit: bool,
 }
 
 impl App {
     fn new() -> Self {
         let library = LibraryState::new();
-        let library_widget = LibraryWidgetState::new(&library);
+        let library_widget = LibraryWidget::new(&library);
 
         Self {
             active_view: ActiveView::Main,
@@ -48,12 +54,20 @@ impl App {
             library_widget,
             player: AudioPlayer::new().expect("Could not create audio player"),
             search: TextInput::new("Search", "Press '/' to search..."),
+            tasks: TaskManager::new(),
+            waveform: None,
             transport: TransportState::default(),
         }
     }
 
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> color_eyre::Result<()> {
         while !self.quit {
+            for result in self.tasks.poll() {
+                match result {
+                    TaskResult::Waveform(data) => self.waveform = Some(data),
+                }
+            }
+
             terminal.draw(|frame| self.draw(frame))?;
             self.handle_events()?;
         }
@@ -65,7 +79,7 @@ impl App {
         let [search_area, main_area, transport_area] = Layout::vertical([
             Constraint::Length(1),
             Constraint::Fill(1),
-            Constraint::Length(3),
+            Constraint::Length(6),
         ])
         .areas(frame.area());
 
@@ -75,8 +89,12 @@ impl App {
         self.library_widget
             .render(&self.library, main_area, frame.buffer_mut());
 
-        self.transport
-            .render(&self.player, transport_area, frame.buffer_mut());
+        self.transport.render(
+            &self.player,
+            self.waveform.as_ref(),
+            transport_area,
+            frame.buffer_mut(),
+        );
     }
 
     fn handle_events(&mut self) -> color_eyre::Result<()> {
@@ -126,8 +144,11 @@ impl App {
                     .library_widget
                     .handle_key_event(key_event) =>
                 {
-                    if let Some(track) = self.library.tracks.get(index) {
-                        let _ = self.player.play(track);
+                    if let Some(track) = self.library.tracks.get(index)
+                        && self.player.play(track).is_ok()
+                    {
+                        self.waveform = None;
+                        self.tasks.set_track(&track.path);
                     }
                 },
                 _ => {},

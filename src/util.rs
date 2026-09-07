@@ -16,3 +16,14 @@ impl DurationExt for std::time::Duration {
         }
     }
 }
+
+/// taken from fnv crate code
+/// didn't add it as a dependency, as it is a pretty simple function
+pub fn fnv1a(bytes: &[u8]) -> u64 {
+    let mut hash = 0xcbf2_9ce4_8422_2325;
+    for &b in bytes {
+        hash ^= b as u64;
+        hash = hash.wrapping_mul(0x0000_0100_0000_01B3);
+    }
+    hash
+}

@@ -15,14 +15,14 @@ use ratatui::{
 
 use crate::library::LibraryState;
 
-pub struct LibraryWidgetState {
+pub struct LibraryWidget {
     pub state: TableState,
     pub filtered_indices: Vec<usize>, // list of filtered indices (pointing to library.tracks)
     pub search_query: String,
     matcher: Matcher,
 }
 
-impl Default for LibraryWidgetState {
+impl Default for LibraryWidget {
     fn default() -> Self {
         let mut state = TableState::default();
         state.select(Some(0));
@@ -35,7 +35,7 @@ impl Default for LibraryWidgetState {
     }
 }
 
-impl LibraryWidgetState {
+impl LibraryWidget {
     pub fn new(library: &LibraryState) -> Self {
         let mut widget = Self::default();
         widget.update_filter(library, "");
