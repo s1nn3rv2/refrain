@@ -38,6 +38,7 @@ Built with Rust and Ratatui.
     | `r` | Rescan `~/Music` directory |
     | `Esc` / `Enter` | Exit search mode |
     | `q` | Quit |
+
 ---
 
 ## Why not rmpc?
