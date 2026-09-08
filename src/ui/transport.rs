@@ -3,9 +3,11 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     widgets::{Block, Borders, Paragraph, Widget},
 };
+use ratatui_image::{Image, protocol::Protocol};
 
 use crate::{
-    audio::AudioPlayer, ui::waveform::WaveformWidget, util::DurationExt, waveform::WaveformData,
+    audio::AudioPlayer, task::COVER_SIZE, ui::waveform::WaveformWidget, util::DurationExt,
+    waveform::WaveformData,
 };
 
 #[derive(Default)]
@@ -16,6 +18,7 @@ impl TransportState {
         &self,
         player: &AudioPlayer,
         waveform: Option<&WaveformData>,
+        cover: Option<&Protocol>,
         area: Rect,
         buf: &mut Buffer,
     ) {
@@ -44,12 +47,21 @@ impl TransportState {
         let inner = block.inner(area);
         block.render(area, buf);
 
+        let [cover_area, details_area] =
+            Layout::horizontal([Constraint::Length(COVER_SIZE.width), Constraint::Fill(1)])
+                .spacing(2)
+                .areas(inner);
+
+        if let Some(protocol) = cover {
+            Image::new(protocol).render(cover_area, buf);
+        }
+
         let [title_area, waveform_area, time_area] = Layout::vertical([
             Constraint::Length(1),
             Constraint::Length(3),
             Constraint::Length(1),
         ])
-        .areas(inner);
+        .areas(details_area);
 
         Paragraph::new(title_display).render(title_area, buf);
 

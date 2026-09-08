@@ -1,24 +1,26 @@
-use std::cmp::Reverse;
+use std::{cmp::Reverse, path::PathBuf};
 
 use crossterm::event::{KeyCode, KeyEvent};
+use lru::LruCache;
 use nucleo_matcher::{
     Matcher, Utf32Str,
     pattern::{CaseMatching, Normalization, Pattern},
 };
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Rect},
+    layout::{Constraint, Rect, Size},
     style::{Color, Modifier, Style},
     symbols::border,
-    widgets::{Block, Cell, Row, StatefulWidget, Table, TableState},
+    text::{Line, Text},
+    widgets::{Block, Cell, Padding, Row, StatefulWidget, Table, TableState, Widget},
 };
+use ratatui_image::{Image, protocol::Protocol};
 
-use crate::library::LibraryState;
+use crate::{library::LibraryState, task::THUMB_SIZE};
 
 pub struct LibraryWidget {
     pub state: TableState,
     pub filtered_indices: Vec<usize>, // list of filtered indices (pointing to library.tracks)
-    pub search_query: String,
     matcher: Matcher,
 }
 
@@ -29,13 +31,14 @@ impl Default for LibraryWidget {
         Self {
             state,
             filtered_indices: Vec::default(),
-            search_query: String::default(),
             matcher: Matcher::default(),
         }
     }
 }
 
 impl LibraryWidget {
+    const ROW_MARGIN: u16 = 1;
+
     pub fn new(library: &LibraryState) -> Self {
         let mut widget = Self::default();
         widget.update_filter(library, "");
@@ -66,8 +69,21 @@ impl LibraryWidget {
             })
     }
 
-    pub fn render(&mut self, library: &LibraryState, area: Rect, buf: &mut Buffer) {
-        let header = Row::new(["Artists", "Title", "Length"]).style(Style::new().bold());
+    pub fn render(
+        &mut self,
+        library: &LibraryState,
+        thumbnails: &mut LruCache<PathBuf, Option<(Size, Protocol)>>,
+        visible: &mut Vec<(PathBuf, Size)>,
+        area: Rect,
+        buf: &mut Buffer,
+    ) {
+        let header = Row::new([
+            Cell::from(""),
+            Cell::from("Artists"),
+            Cell::from("Title"),
+            Cell::from(Line::from("Length").right_aligned()), // cell has no right_aligned lol
+        ])
+        .style(Style::new().bold());
         let rows: Vec<Row> = self
             .filtered_indices
             .iter()
@@ -77,36 +93,99 @@ impl LibraryWidget {
                 let duration_display =
                     format!("{:02}:{:02}", duration_secs / 60, duration_secs % 60);
 
+                let centered_artist =
+                    Text::from(vec![Line::from(""), Line::from(track.formatted_artists())]);
+
+                let centered_title =
+                    Text::from(vec![Line::from(""), Line::from(track.title.as_str())]);
+
+                let centered_duration = Text::from(vec![
+                    Line::from(""),
+                    Line::from(duration_display).right_aligned(),
+                ]);
+
                 Row::new([
-                    Cell::from(track.formatted_artists()),
-                    Cell::from(track.title.as_str()),
-                    Cell::from(duration_display),
+                    Cell::from(""), // for cover art
+                    Cell::from(centered_artist),
+                    Cell::from(centered_title),
+                    Cell::from(centered_duration),
                 ])
+                .height(THUMB_SIZE.height)
+                .bottom_margin(Self::ROW_MARGIN)
             })
             .collect();
 
         let widths = [
-            Constraint::Percentage(30),
-            Constraint::Percentage(50),
-            Constraint::Percentage(20),
+            Constraint::Length(THUMB_SIZE.width),
+            Constraint::Percentage(35),
+            Constraint::Fill(1),
+            Constraint::Percentage(8),
         ];
+
+        let block = Block::bordered()
+            .title(" Library ")
+            .border_set(border::THICK)
+            .padding(Padding::horizontal(1));
+
+        let inner = block.inner(area);
 
         let table = Table::new(rows, widths)
             .header(header)
-            .block(
-                Block::bordered()
-                    .title(" Library ")
-                    .border_set(border::THICK),
-            )
+            .block(block)
             .column_spacing(1)
             .row_highlight_style(
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(Color::White)
+                    .bg(Color::DarkGray)
                     .add_modifier(Modifier::BOLD),
-            )
-            .highlight_symbol("> ");
+            );
 
         StatefulWidget::render(table, area, buf, &mut self.state);
+
+        let first_row_y = inner.y + 1;
+        let first_row_x = inner.x;
+        let offset = self.state.offset(); // scroll position, index of first visible row
+
+        for (screen_row, &track_index) in self
+            .filtered_indices
+            .iter()
+            .skip(offset)
+            .enumerate()
+        {
+            let y = first_row_y + screen_row as u16 * (THUMB_SIZE.height + Self::ROW_MARGIN);
+            if y + THUMB_SIZE.height > inner.y + inner.height {
+                break;
+            }
+
+            let Some(track) = library.tracks.get(track_index) else {
+                continue;
+            };
+
+            let rect = Rect {
+                x: first_row_x,
+                y,
+                width: THUMB_SIZE.width,
+                height: THUMB_SIZE.height,
+            };
+
+            match thumbnails.get(&track.path) {
+                // cached at size we want, draw
+                Some(Some((size, protocol))) if *size == THUMB_SIZE => {
+                    Image::new(protocol).render(rect, buf);
+                },
+                // cached at other size, draw it and then ask for rebuild
+                Some(Some((_, protocol))) => {
+                    Image::new(protocol)
+                        .allow_clipping(true)
+                        .render(rect, buf);
+                    visible.push((track.path.clone(), THUMB_SIZE));
+                },
+                // track has no art
+                Some(None) => {},
+                // never seen, ask for it
+                None => visible.push((track.path.clone(), THUMB_SIZE)),
+            }
+        }
     }
 
     pub fn handle_key_event(&mut self, key_event: KeyEvent) -> Option<usize> {
@@ -159,6 +238,8 @@ impl LibraryWidget {
         }
 
         // Change table selection to first match
+        // TODO: make so it doesn't always change when the track you already have selected appears
+        // in the search results
         if self.filtered_indices.is_empty() {
             self.state.select(None);
         } else {

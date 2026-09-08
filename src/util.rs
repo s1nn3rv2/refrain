@@ -26,6 +26,8 @@ impl DurationExt for std::time::Duration {
 
 /// taken from fnv crate code
 /// didn't add it as a dependency, as it is a pretty simple function
+/// Why use this instead of DefaultHasher? DefaultHasher is not stable,
+/// so cache could be invalidated during rust changes, using this prevents that.
 pub fn fnv1a(bytes: &[u8]) -> u64 {
     let mut hash = 0xcbf2_9ce4_8422_2325;
     for &b in bytes {
@@ -51,6 +53,12 @@ pub fn get_mtime(file_path: &Path) -> u128 {
 pub fn cache_path(track_path: &Path, dir: &str, ext: &str) -> PathBuf {
     let mtime = get_mtime(track_path);
 
+    // We add mtime as a key so when a track is modified (cover art update, tags), cache is
+    // invalidated and it no longer uses old saved information
+    //
+    // Now, this also means that old cache records are not being removed, but it doesn't really
+    // matter in terms of space at all. Perhaps for cover it is a bigger difference, but it's still
+    // like max 200KB, so it wont be an issue either.
     let key = format!("{}:{mtime}", track_path.display());
     let hash = fnv1a(key.as_bytes());
 

@@ -1,4 +1,5 @@
 mod audio;
+mod cover;
 mod library;
 mod task;
 mod ui;
@@ -6,16 +7,20 @@ mod util;
 mod waveform;
 
 use std::{
+    num::NonZeroUsize,
+    path::PathBuf,
     sync::mpsc::{self, Receiver, RecvTimeoutError},
     thread,
     time::Duration,
 };
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use lru::LruCache;
 use ratatui::{
     DefaultTerminal, Frame,
-    layout::{Constraint, Layout},
+    layout::{Constraint, Layout, Size},
 };
+use ratatui_image::{picker::Picker, protocol::Protocol};
 
 use crate::{
     audio::AudioPlayer,
@@ -37,6 +42,8 @@ pub enum ActiveView {
 pub enum AppEvent {
     Input(Event),
     Waveform(usize, Box<WaveformData>), // box for clippy warning about large size difference
+    Cover(usize, Option<Protocol>),     // cover art in transport
+    Thumbnail(PathBuf, Size, Option<Protocol>), // cover arts in library
 }
 
 pub struct App {
@@ -48,6 +55,12 @@ pub struct App {
     search: TextInput,
     tasks: TaskManager,
     waveform: Option<WaveformData>,
+    cover: Option<Protocol>, // transport cover art
+    // Why do we keep size here? A compact mode or a grid viewer could be added, where image size
+    // will be different
+    thumbnails: LruCache<PathBuf, Option<(Size, Protocol)>>, // holds up to 128 protocols
+    // contains all visible tracks (tracks that need cover arts to be loaded)
+    visible: Vec<(PathBuf, Size)>,
     events: Receiver<AppEvent>,
     quit: bool,
 }
@@ -56,7 +69,7 @@ impl App {
     /// we use it only for elapsed time (and playhead)
     const TICK: Duration = Duration::from_millis(250);
 
-    fn new() -> Self {
+    fn new(picker: Picker) -> Self {
         let library = LibraryState::new();
         let library_widget = LibraryWidget::new(&library);
 
@@ -83,7 +96,10 @@ impl App {
             library_widget,
             player: AudioPlayer::new().expect("Could not create audio player"),
             search: TextInput::new("Search", "Press '/' to search..."),
-            tasks: TaskManager::new(events_tx),
+            tasks: TaskManager::new(picker, events_tx),
+            cover: None,
+            thumbnails: LruCache::new(NonZeroUsize::new(128).unwrap()),
+            visible: Vec::new(),
             events: events_rx,
             waveform: None,
             transport: TransportState::default(),
@@ -94,14 +110,22 @@ impl App {
         while !self.quit {
             terminal.draw(|frame| self.draw(frame))?;
 
+            // empty visible and pass all visible songs to request_covers
+            // we empty visible because we recreate it on the next frame
+            self.tasks
+                .request_covers(std::mem::take(&mut self.visible));
+
+            // sleep until event arrives (or 250ms passes)
             match self
                 .events
                 .recv_timeout(Self::TICK)
             {
-                Ok(AppEvent::Input(event)) => self.handle_event(event),
-                Ok(AppEvent::Waveform(generation, data)) => {
-                    if self.tasks.is_current(generation) {
-                        self.waveform = Some(*data);
+                Ok(event) => {
+                    self.apply(event);
+                    // check if there are any other events piled up, if so, process them in that
+                    // frame too
+                    while let Ok(event) = self.events.try_recv() {
+                        self.apply(event);
                     }
                 },
                 Err(RecvTimeoutError::Timeout) => {},
@@ -110,6 +134,27 @@ impl App {
         }
 
         Ok(())
+    }
+
+    /// Receives background worker outputs and updates app state
+    fn apply(&mut self, event: AppEvent) {
+        match event {
+            AppEvent::Input(event) => self.handle_event(event),
+            AppEvent::Waveform(generation, data) => {
+                if self.tasks.is_current(generation) {
+                    self.waveform = Some(*data);
+                }
+            },
+            AppEvent::Cover(generation, protocol) => {
+                if self.tasks.is_current(generation) {
+                    self.cover = protocol;
+                }
+            },
+            AppEvent::Thumbnail(path, size, protocol) => {
+                self.thumbnails
+                    .put(path, protocol.map(|protocol| (size, protocol)));
+            },
+        }
     }
 
     fn draw(&mut self, frame: &mut Frame) {
@@ -123,12 +168,18 @@ impl App {
         self.search
             .render(frame, search_area);
 
-        self.library_widget
-            .render(&self.library, main_area, frame.buffer_mut());
+        self.library_widget.render(
+            &self.library,
+            &mut self.thumbnails,
+            &mut self.visible,
+            main_area,
+            frame.buffer_mut(),
+        );
 
         self.transport.render(
             &self.player,
             self.waveform.as_ref(),
+            self.cover.as_ref(),
             transport_area,
             frame.buffer_mut(),
         );
@@ -181,6 +232,7 @@ impl App {
                         && self.player.play(track).is_ok()
                     {
                         self.waveform = None;
+                        self.cover = None;
                         self.tasks.set_track(&track.path);
                     }
                 },
@@ -197,5 +249,7 @@ impl App {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
 
-    ratatui::run(|terminal| App::new().run(terminal))
+    let picker = Picker::from_query_stdio()?;
+
+    ratatui::run(|terminal| App::new(picker).run(terminal))
 }
