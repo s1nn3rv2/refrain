@@ -24,6 +24,14 @@ impl WaveformWidget {
             progress: progress.clamp(0.0, 1.0),
         }
     }
+
+    // renders flat center line
+    pub fn empty() -> Self {
+        Self {
+            data: [0; crate::waveform::WAVEFORM_POINTS],
+            progress: 0.0,
+        }
+    }
 }
 
 impl Widget for WaveformWidget {
@@ -46,6 +54,8 @@ impl Widget for WaveformWidget {
         // column index where playhead is right now
         let played_boundary = (self.progress * num_points as f64).round() as usize;
 
+        // TODO: could add animation of it rising when its loaded (center-rise and left-to-right wave
+        // maybe?)
         Canvas::default()
             .marker(Marker::Braille) // braille seems the highest res
             .x_bounds([0.0, num_points as f64])

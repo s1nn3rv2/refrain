@@ -65,8 +65,9 @@ impl TransportState {
 
         Paragraph::new(title_display).render(title_area, buf);
 
-        if let Some(wf) = waveform {
-            WaveformWidget::new(*wf, progress).render(waveform_area, buf);
+        match waveform {
+            Some(wf) => WaveformWidget::new(*wf, progress).render(waveform_area, buf),
+            None => WaveformWidget::empty().render(waveform_area, buf),
         }
 
         Paragraph::new(time_display).render(time_area, buf);
