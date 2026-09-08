@@ -5,6 +5,7 @@ use rodio::{Decoder, DeviceSinkBuilder, MixerDeviceSink, Player};
 
 use crate::library::Track;
 
+// TODO: add MPRIS support
 pub struct AudioPlayer {
     _device_sink: MixerDeviceSink,
     player: Player,

@@ -81,6 +81,7 @@ impl LibraryWidget {
             Cell::from(""),
             Cell::from("Artists"),
             Cell::from("Title"),
+            Cell::from("Album"),
             Cell::from(Line::from("Length").right_aligned()), // cell has no right_aligned lol
         ])
         .style(Style::new().bold());
@@ -99,6 +100,16 @@ impl LibraryWidget {
                 let centered_title =
                     Text::from(vec![Line::from(""), Line::from(track.title.as_str())]);
 
+                let centered_album = Text::from(vec![
+                    Line::from(""),
+                    Line::from(
+                        track
+                            .album
+                            .as_deref()
+                            .unwrap_or(""),
+                    ),
+                ]);
+
                 let centered_duration = Text::from(vec![
                     Line::from(""),
                     Line::from(duration_display).right_aligned(),
@@ -108,6 +119,7 @@ impl LibraryWidget {
                     Cell::from(""), // for cover art
                     Cell::from(centered_artist),
                     Cell::from(centered_title),
+                    Cell::from(centered_album),
                     Cell::from(centered_duration),
                 ])
                 .height(THUMB_SIZE.height)
@@ -117,8 +129,9 @@ impl LibraryWidget {
 
         let widths = [
             Constraint::Length(THUMB_SIZE.width),
-            Constraint::Percentage(35),
+            Constraint::Percentage(20),
             Constraint::Fill(1),
+            Constraint::Percentage(20),
             Constraint::Percentage(8),
         ];
 
