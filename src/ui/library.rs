@@ -85,6 +85,8 @@ impl LibraryWidget {
             Cell::from(Line::from("Length").right_aligned()), // cell has no right_aligned lol
         ])
         .style(Style::new().bold());
+        // track number & disc number should only display in context of album, not on themselves
+        // (could add an option to config for that perhaps if someone wants that)
         let rows: Vec<Row> = self
             .filtered_indices
             .iter()
