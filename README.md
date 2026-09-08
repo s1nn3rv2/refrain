@@ -29,15 +29,15 @@ Built with Rust and Ratatui.
 ## Keybindings
 
 | Key | Action |
-    |:---|:---|
-    | `j` / `Down` | Move down |
-    | `k` / `Up` | Move up |
-    | `Enter` / `l` | Play selected track |
-    | `p` | Play / Pause |
-    | `/` | Open fuzzy search |
-    | `r` | Rescan `~/Music` directory |
-    | `Esc` / `Enter` | Exit search mode |
-    | `q` | Quit |
+|:---|:---|
+| `j` / `Down` | Move down |
+| `k` / `Up` | Move up |
+| `Enter` / `l` | Play selected track |
+| `p` | Play / Pause |
+| `/` | Open fuzzy search |
+| `r` | Rescan `~/Music` directory |
+| `Esc` / `Enter` | Exit search mode |
+| `q` | Quit |
 
 ---
 
@@ -54,12 +54,14 @@ Rmpc is a really good option as well! But I missed having cover arts displayed o
 
 ## Build & Run
 
+```bash
 # Clone the repository
-`git clone https://github.com/s1nn3rv2/refrain.git`
-`cd refrain`
+git clone https://github.com/s1nn3rv2/refrain.git
+cd refrain
 
 # Run in release mode (it is WAY faster in release mode)
-`cargo run --release`
+cargo run --release
+```
 
 ## Contributing
 
