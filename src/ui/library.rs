@@ -37,6 +37,8 @@ impl Default for LibraryWidget {
 }
 
 impl LibraryWidget {
+    // searchable tags, by key:value
+    const TAG_KEYS: [&str; 5] = ["title", "artist", "album", "genre", "date"];
     const ROW_MARGIN: u16 = 1;
 
     pub fn new(library: &LibraryState) -> Self {
@@ -218,39 +220,109 @@ impl LibraryWidget {
         }
     }
 
+    // TODO: add a date key, where you can search by range too
+    // TODO: add so you can match strictly (not fuzzy), by writing key=value instead of key:value
+    // maybe?
     pub fn update_filter(&mut self, library: &LibraryState, query: &str) {
         let query = query.trim();
 
         if query.is_empty() {
             // return all tracks
             self.filtered_indices = (0..library.tracks.len()).collect();
-        } else {
-            let pattern = Pattern::parse(query, CaseMatching::Smart, Normalization::Smart);
-            let mut haystack_buf = String::with_capacity(128);
-            let mut utf32_buf = Vec::new();
+            // reset table cur selected
+            if self.filtered_indices.is_empty() {
+                self.state.select(None);
+            } else {
+                self.state.select(Some(0));
+            }
+            return;
+        }
 
-            let mut scored_matches: Vec<(u32, usize)> = library
-                .tracks
-                .iter()
-                .enumerate()
-                .filter_map(|(idx, track)| {
+        // separate tags (genre:xxx, artist:xxx, alum:xxx)
+        let tokens = Self::tokenize(query);
+        let mut tags = Vec::new();
+        // all non-tag words
+        let mut generic_terms = Vec::new();
+
+        for token in &tokens {
+            match token.split_once(':') {
+                Some((key, val)) if !val.is_empty() && Self::TAG_KEYS.contains(&key) => {
+                    tags.push((
+                        key,
+                        Pattern::parse(val, CaseMatching::Smart, Normalization::Smart),
+                    ))
+                },
+                _ => generic_terms.push(token.as_str()),
+            }
+        }
+
+        // this is everything except the tags
+        let generic_query = generic_terms.join(" ");
+        let generic_pat = if generic_query.is_empty() {
+            None
+        } else {
+            Some(Pattern::parse(
+                &generic_query,
+                CaseMatching::Smart,
+                Normalization::Smart,
+            ))
+        };
+
+        let mut haystack_buf = String::with_capacity(128);
+        let mut str_buf = Vec::new();
+
+        let mut scored_matches: Vec<(u32, usize)> = library
+            .tracks
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, track)| {
+                // check if tags on this track match our tags from the search query
+                let all_tags_match = tags.iter().all(|(key, pat)| {
+                    let field: &str = match *key {
+                        "title" => &track.title,
+                        "genre" => track
+                            .genre
+                            .as_deref()
+                            .unwrap_or(""),
+                        "artist" => &track.formatted_artists(),
+                        "album" => track
+                            .album
+                            .as_deref()
+                            .unwrap_or(""),
+                        "date" => track.date.as_deref().unwrap_or(""),
+                        // unreachable
+                        _ => return false,
+                    };
+                    pat.score(Utf32Str::new(field, &mut str_buf), &mut self.matcher)
+                        .is_some()
+                });
+
+                if !all_tags_match {
+                    return None;
+                }
+
+                if let Some(ref pat) = generic_pat {
                     haystack_buf.clear();
                     track.write_search_haystack(&mut haystack_buf);
 
-                    let haystack_utf32 = Utf32Str::new(&haystack_buf, &mut utf32_buf);
-                    let score = pattern.score(haystack_utf32, &mut self.matcher)?;
+                    let score = pat.score(
+                        Utf32Str::new(&haystack_buf, &mut str_buf),
+                        &mut self.matcher,
+                    )?;
                     Some((score, idx))
-                })
-                .collect();
+                } else {
+                    Some((1, idx))
+                }
+            })
+            .collect();
 
-            // sort descending
-            scored_matches.sort_by_key(|&(score, _)| Reverse(score));
+        // sort descending
+        scored_matches.sort_by_key(|&(score, _)| Reverse(score));
 
-            self.filtered_indices = scored_matches
-                .into_iter()
-                .map(|(_, idx)| idx)
-                .collect();
-        }
+        self.filtered_indices = scored_matches
+            .into_iter()
+            .map(|(_, idx)| idx)
+            .collect();
 
         // Change table selection to first match
         // TODO: make so it doesn't always change when the track you already have selected appears
@@ -260,5 +332,34 @@ impl LibraryWidget {
         } else {
             self.state.select(Some(0));
         }
+    }
+
+    /// Splits a query on whitespace, except inside double quotes, so a tag value can hold spaces. For
+    /// example: `artist:"best artist ever" edm` -> ["artist:best artist ever", "edm"]
+    // TODO: we do not handle unfinished quotes yet, but I don't know how to properly deal with
+    // those yet
+    fn tokenize(query: &str) -> Vec<String> {
+        let mut tokens = Vec::new();
+        let mut current = String::new();
+        let mut quoted = false; // keep track of quotes
+
+        for c in query.chars() {
+            match c {
+                '"' => quoted = !quoted,
+                c if c.is_whitespace() && !quoted => {
+                    if !current.is_empty() {
+                        tokens.push(std::mem::take(&mut current));
+                    }
+                },
+                // otherwise, we append the character to current
+                c => current.push(c),
+            }
+        }
+
+        if !current.is_empty() {
+            tokens.push(current);
+        }
+
+        tokens
     }
 }
