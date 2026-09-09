@@ -76,14 +76,22 @@ impl LibraryWidget {
             })
     }
 
+    // TODO: add marquee elements so text that goes beyond rect scrolls horizontally
     pub fn render(
         &mut self,
+        is_focused: bool,
         library: &LibraryState,
         thumbnails: &mut LruCache<PathBuf, Option<(Size, Protocol)>>,
         visible: &mut Vec<(PathBuf, Size)>,
         area: Rect,
         buf: &mut Buffer,
     ) {
+        let border_style = if is_focused {
+            Style::default().fg(Color::Cyan)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
+
         let header = Row::new([
             Cell::from(""),
             Cell::from("Artists"),
@@ -147,7 +155,8 @@ impl LibraryWidget {
         let block = Block::bordered()
             .title(" Library ")
             .border_set(border::THICK)
-            .padding(Padding::horizontal(1));
+            .padding(Padding::horizontal(1))
+            .border_style(border_style);
 
         let inner = block.inner(area);
 

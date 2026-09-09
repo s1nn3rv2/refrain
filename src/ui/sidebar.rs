@@ -42,9 +42,16 @@ impl SidebarWidget {
         self.selected_tab = (self.selected_tab + Self::TABS.len() - 1) % Self::TABS.len();
     }
 
-    pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
+    pub fn render(&mut self, is_focused: bool, area: Rect, buf: &mut Buffer) {
+        let border_style = if is_focused {
+            Style::default().fg(Color::Cyan)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
+
         let block = Block::bordered()
             .border_set(border::THICK)
+            .border_style(border_style)
             .title(" Sidebar ");
 
         let inner = block.inner(area);

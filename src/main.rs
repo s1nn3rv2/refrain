@@ -31,15 +31,16 @@ use crate::{
     ui::{
         input::{InputAction, TextInput},
         library::{LibraryAction, LibraryWidget},
-        sidebar::SidebarWidget,
+        sidebar::{SidebarAction, SidebarWidget},
         transport::{TransportAction, TransportState},
     },
     waveform::WaveformData,
 };
 
+#[derive(PartialEq)]
 pub enum ActiveView {
-    Main,
-    Search,
+    Library,
+    Sidebar,
 }
 
 pub enum AppEvent {
@@ -94,7 +95,7 @@ impl App {
         });
 
         Self {
-            active_view: ActiveView::Main,
+            active_view: ActiveView::Library,
             quit: false,
             library,
             library_widget,
@@ -173,13 +174,17 @@ impl App {
         let [sidebar_area, library_area] =
             Layout::horizontal([Constraint::Percentage(20), Constraint::Fill(1)]).areas(main_area);
 
-        self.sidebar
-            .render(sidebar_area, frame.buffer_mut());
+        self.sidebar.render(
+            self.is_pane_focused(ActiveView::Sidebar),
+            sidebar_area,
+            frame.buffer_mut(),
+        );
 
         self.search
             .render(frame, search_area);
 
         self.library_widget.render(
+            self.is_pane_focused(ActiveView::Library),
             &self.library,
             &mut self.thumbnails,
             &mut self.visible,
@@ -216,49 +221,64 @@ impl App {
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
-        match self.active_view {
-            ActiveView::Search => {
-                match self
-                    .search
-                    .handle_key_event(key_event)
-                {
-                    InputAction::Changed => {
-                        // filter tracks
-                        self.library_widget
-                            .update_filter(&self.library, &self.search.value);
-                    },
-                    InputAction::Submitted | InputAction::Escaped => {
-                        // go back to main view
-                        self.active_view = ActiveView::Main
-                    },
-                    _ => {},
-                }
-            },
-            ActiveView::Main => match key_event.code {
-                KeyCode::Char('q') => self.exit(),
-                KeyCode::Char('p') => self.player.resume_pause(),
-                KeyCode::Char('r') => {
-                    let _ = self.library.scan();
+        // Search mode has exclusive keyobard input!
+        if self.search.is_focused {
+            match self
+                .search
+                .handle_key_event(key_event)
+            {
+                InputAction::Changed => {
                     self.library_widget
                         .update_filter(&self.library, &self.search.value);
                 },
-                KeyCode::Char('/') => {
-                    self.active_view = ActiveView::Search;
-                    self.search.focus();
+                InputAction::Submitted | InputAction::Escaped => {
+                    self.search.unfocus();
                 },
-                KeyCode::Char('[') | KeyCode::Char(']') => {
-                    if let Some(action) = self
-                        .sidebar
-                        .handle_key_event(key_event)
-                    {}
-                },
-                _ => match self
+                _ => {},
+            }
+            return;
+        }
+
+        match key_event.code {
+            KeyCode::Char('q') => self.exit(),
+            KeyCode::Char('p') => self.player.resume_pause(),
+            KeyCode::Char('r') => {
+                let _ = self.library.scan();
+                self.library_widget
+                    .update_filter(&self.library, &self.search.value);
+            },
+            KeyCode::Char('/') => {
+                self.search.focus();
+                return;
+            },
+            KeyCode::Tab => {
+                self.active_view = match self.active_view {
+                    ActiveView::Sidebar => ActiveView::Library,
+                    _ => ActiveView::Sidebar,
+                };
+                return;
+            },
+            _ => {},
+        }
+
+        match self.active_view {
+            ActiveView::Sidebar => {
+                match self
+                    .sidebar
+                    .handle_key_event(key_event)
+                {
+                    Some(SidebarAction::ApplyFilter { key, value }) => {},
+                    None => {},
+                }
+            },
+            ActiveView::Library => {
+                match self
                     .library_widget
                     .handle_key_event(key_event)
                 {
                     Some(LibraryAction::Play(idx)) => self.play_track(idx),
                     None => {},
-                },
+                }
             },
         }
     }
@@ -272,6 +292,13 @@ impl App {
             self.cover = None;
             self.tasks.set_track(&track.path);
         }
+    }
+
+    // exists, because I want so when search input field is focused, I want the rest of the views to
+    // not have the highlighted borders, to bring more attention that youre focused on the search
+    // input field
+    fn is_pane_focused(&self, view: ActiveView) -> bool {
+        !self.search.is_focused && self.active_view == view
     }
 
     fn exit(&mut self) {
