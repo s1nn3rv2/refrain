@@ -22,7 +22,7 @@ Built with Rust and Ratatui.
 - [ ] MPRIS support - allows you to control and see the current song in your system's media player 
 - [ ] Queue management
 - [ ] Context-aware shuffle - knows your context, whether you're in an album, genre or everything, it knows what songs to pick from
-- [ ] Synced lyrics - see automatically fetches and scrolls lyrics 
+- [ ] Synced lyrics - automatically fetches and scrolls lyrics 
 - [ ] Gapless playback - seamless track transitions
 - [ ] Extensible config support - allows you to adjust the player to your liking 
 

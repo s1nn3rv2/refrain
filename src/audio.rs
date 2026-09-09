@@ -1,4 +1,4 @@
-use std::{fs::File, io::BufReader, time::Duration};
+use std::{fs::File, time::Duration};
 
 use color_eyre::eyre::Context;
 use rodio::{Decoder, DeviceSinkBuilder, MixerDeviceSink, Player};
@@ -14,8 +14,8 @@ pub struct AudioPlayer {
 
 impl AudioPlayer {
     pub fn new() -> color_eyre::Result<Self> {
-        let device_sink = DeviceSinkBuilder::open_default_sink()
-            .map_err(|e| color_eyre::eyre::eyre!("Failed to open audio device: {e}"))?;
+        let device_sink =
+            DeviceSinkBuilder::open_default_sink().wrap_err("Failed to open audio device")?;
 
         let player = Player::connect_new(device_sink.mixer());
 
@@ -29,9 +29,10 @@ impl AudioPlayer {
     pub fn play(&mut self, track: &Track) -> color_eyre::Result<()> {
         let file = File::open(&track.path)
             .wrap_err_with(|| format!("Failed to open file: {:?}", track.path))?;
-        let reader = BufReader::new(file);
 
-        let source = Decoder::try_from(reader).wrap_err("Failed to decode audio file")?;
+        // if you pass in a BufReader instead of directly the file, seeking backwards doesn't seem
+        // to work lol, so keep that in mind
+        let source = Decoder::try_from(file).wrap_err("Failed to decode audio file")?;
 
         self.player.stop();
         self.player.append(source);
@@ -50,6 +51,12 @@ impl AudioPlayer {
         } else {
             self.player.play();
         }
+    }
+
+    pub fn seek(&self, position: Duration) -> color_eyre::Result<()> {
+        self.player
+            .try_seek(position)
+            .wrap_err("Failed to seek audio")
     }
 
     pub fn current_track(&self) -> Option<&Track> {

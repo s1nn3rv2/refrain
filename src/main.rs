@@ -14,7 +14,9 @@ use std::{
     time::Duration,
 };
 
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{
+    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind,
+};
 use lru::LruCache;
 use ratatui::{
     DefaultTerminal, Frame,
@@ -29,7 +31,7 @@ use crate::{
     ui::{
         input::{InputAction, TextInput},
         library::LibraryWidget,
-        transport::TransportState,
+        transport::{TransportAction, TransportState},
     },
     waveform::WaveformData,
 };
@@ -186,10 +188,21 @@ impl App {
     }
 
     fn handle_event(&mut self, event: Event) {
-        if let Event::Key(key_event) = event
-            && key_event.kind == KeyEventKind::Press
-        {
-            self.handle_key_event(key_event);
+        match event {
+            Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
+                self.handle_key_event(key_event);
+            },
+            Event::Mouse(mouse_event)
+                if let Some(TransportAction::Seek(progress)) = self
+                    .transport
+                    .handle_mouse_event(mouse_event) =>
+            {
+                if let Some(track) = self.player.current_track() {
+                    let target_time = track.length.mul_f64(progress);
+                    let _ = self.player.seek(target_time);
+                }
+            },
+            _ => {},
         }
     }
 
@@ -251,5 +264,13 @@ fn main() -> color_eyre::Result<()> {
 
     let picker = Picker::from_query_stdio()?;
 
-    ratatui::run(|terminal| App::new(picker).run(terminal))
+    // enable mouse capture
+    crossterm::execute!(std::io::stdout(), EnableMouseCapture)?;
+
+    let res = ratatui::run(|terminal| App::new(picker).run(terminal));
+
+    // disable mouse capture on exit
+    let _ = crossterm::execute!(std::io::stdout(), DisableMouseCapture);
+
+    res
 }

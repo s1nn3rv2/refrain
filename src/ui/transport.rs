@@ -1,6 +1,7 @@
+use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Layout, Rect},
+    layout::{Constraint, Layout, Position, Rect},
     widgets::{Block, Borders, Paragraph, Widget},
 };
 use ratatui_image::{Image, protocol::Protocol};
@@ -10,12 +11,18 @@ use crate::{
     waveform::WaveformData,
 };
 
+pub enum TransportAction {
+    Seek(f64), // progress from 0..1.0
+}
+
 #[derive(Default)]
-pub struct TransportState {}
+pub struct TransportState {
+    waveform_area: Rect,
+}
 
 impl TransportState {
     pub fn render(
-        &self,
+        &mut self,
         player: &AudioPlayer,
         waveform: Option<&WaveformData>,
         cover: Option<&Protocol>,
@@ -63,6 +70,8 @@ impl TransportState {
         ])
         .areas(details_area);
 
+        self.waveform_area = waveform_area;
+
         Paragraph::new(title_display).render(title_area, buf);
 
         match waveform {
@@ -71,5 +80,25 @@ impl TransportState {
         }
 
         Paragraph::new(time_display).render(time_area, buf);
+    }
+
+    pub fn handle_mouse_event(&self, event: MouseEvent) -> Option<TransportAction> {
+        match event.kind {
+            MouseEventKind::Down(MouseButton::Left) | MouseEventKind::Drag(MouseButton::Left) => {
+                let click_pos = Position::new(event.column, event.row);
+
+                // check if click was inside the waveform area
+                if self
+                    .waveform_area
+                    .contains(click_pos)
+                {
+                    let offset = (event.column - self.waveform_area.x) as f64;
+                    let progress = (offset / self.waveform_area.width as f64).clamp(0.0, 1.0);
+                    return Some(TransportAction::Seek(progress));
+                }
+            },
+            _ => {},
+        }
+        None
     }
 }

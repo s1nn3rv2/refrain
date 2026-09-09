@@ -82,9 +82,6 @@ impl Track {
             }
         }
 
-        // We do not keep it in search memory, it has derived fields and is cheap to build so no
-        // need to keep it in cache, although in future perhaps we could make it be in cache for
-        // faster loading? we'll see
         Self {
             path,
             title,
@@ -113,6 +110,9 @@ impl Track {
     }
 
     /// Returns a search haystack string, containing all searchable fields
+    // We do not keep it in search memory, it has derived fields and is cheap to build so no
+    // need to keep it in cache, although in future perhaps we could make it be in cache for
+    // faster loading? we'll see
     pub fn write_search_haystack(&self, out: &mut String) {
         use std::fmt::Write as _;
         let _ = write!(
