@@ -82,6 +82,7 @@ impl TransportState {
         Paragraph::new(time_display).render(time_area, buf);
     }
 
+    // TODO: add debouncing to seeking (update UI state but don't constantly seek on drag, that lags)
     pub fn handle_mouse_event(&self, event: MouseEvent) -> Option<TransportAction> {
         match event.kind {
             MouseEventKind::Down(MouseButton::Left) | MouseEventKind::Drag(MouseButton::Left) => {

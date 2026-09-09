@@ -30,7 +30,7 @@ use crate::{
     task::TaskManager,
     ui::{
         input::{InputAction, TextInput},
-        library::LibraryWidget,
+        library::{LibraryAction, LibraryWidget},
         transport::{TransportAction, TransportState},
     },
     waveform::WaveformData,
@@ -237,20 +237,25 @@ impl App {
                     self.active_view = ActiveView::Search;
                     self.search.focus();
                 },
-                _ if let Some(index) = self
+                _ => match self
                     .library_widget
-                    .handle_key_event(key_event) =>
+                    .handle_key_event(key_event)
                 {
-                    if let Some(track) = self.library.tracks.get(index)
-                        && self.player.play(track).is_ok()
-                    {
-                        self.waveform = None;
-                        self.cover = None;
-                        self.tasks.set_track(&track.path);
-                    }
+                    Some(LibraryAction::Play(idx)) => self.play_track(idx),
+                    None => {},
                 },
-                _ => {},
             },
+        }
+    }
+
+    // Later on, we should pass Track instead of an index to avoid any bugs on rescans etc
+    fn play_track(&mut self, index: usize) {
+        if let Some(track) = self.library.tracks.get(index)
+            && self.player.play(track).is_ok()
+        {
+            self.waveform = None;
+            self.cover = None;
+            self.tasks.set_track(&track.path);
         }
     }
 

@@ -18,6 +18,10 @@ use ratatui_image::{Image, protocol::Protocol};
 
 use crate::{library::LibraryState, task::THUMB_SIZE};
 
+pub enum LibraryAction {
+    Play(usize), // track index in library.tracks
+}
+
 pub struct LibraryWidget {
     pub state: TableState,
     pub filtered_indices: Vec<usize>, // list of filtered indices (pointing to library.tracks)
@@ -205,7 +209,7 @@ impl LibraryWidget {
         }
     }
 
-    pub fn handle_key_event(&mut self, key_event: KeyEvent) -> Option<usize> {
+    pub fn handle_key_event(&mut self, key_event: KeyEvent) -> Option<LibraryAction> {
         match key_event.code {
             KeyCode::Char('j') | KeyCode::Down => {
                 self.next();
@@ -215,7 +219,9 @@ impl LibraryWidget {
                 self.prev();
                 None
             },
-            KeyCode::Char('l') | KeyCode::Enter => self.selected_track_index(),
+            KeyCode::Char('l') | KeyCode::Enter => self
+                .selected_track_index()
+                .map(LibraryAction::Play),
             _ => None,
         }
     }
