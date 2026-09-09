@@ -31,6 +31,7 @@ use crate::{
     ui::{
         input::{InputAction, TextInput},
         library::{LibraryAction, LibraryWidget},
+        sidebar::SidebarWidget,
         transport::{TransportAction, TransportState},
     },
     waveform::WaveformData,
@@ -53,6 +54,7 @@ pub struct App {
     transport: TransportState,
     library: LibraryState,
     library_widget: LibraryWidget,
+    sidebar: SidebarWidget,
     player: AudioPlayer,
     search: TextInput,
     tasks: TaskManager,
@@ -96,6 +98,7 @@ impl App {
             quit: false,
             library,
             library_widget,
+            sidebar: SidebarWidget::new(),
             player: AudioPlayer::new().expect("Could not create audio player"),
             search: TextInput::new("Search", "Press '/' to search..."),
             tasks: TaskManager::new(picker, events_tx),
@@ -167,6 +170,12 @@ impl App {
         ])
         .areas(frame.area());
 
+        let [sidebar_area, library_area] =
+            Layout::horizontal([Constraint::Percentage(20), Constraint::Fill(1)]).areas(main_area);
+
+        self.sidebar
+            .render(sidebar_area, frame.buffer_mut());
+
         self.search
             .render(frame, search_area);
 
@@ -174,7 +183,7 @@ impl App {
             &self.library,
             &mut self.thumbnails,
             &mut self.visible,
-            main_area,
+            library_area,
             frame.buffer_mut(),
         );
 
@@ -236,6 +245,12 @@ impl App {
                 KeyCode::Char('/') => {
                     self.active_view = ActiveView::Search;
                     self.search.focus();
+                },
+                KeyCode::Char('[') | KeyCode::Char(']') => {
+                    if let Some(action) = self
+                        .sidebar
+                        .handle_key_event(key_event)
+                    {}
                 },
                 _ => match self
                     .library_widget

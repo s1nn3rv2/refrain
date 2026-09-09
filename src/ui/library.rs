@@ -42,6 +42,7 @@ impl Default for LibraryWidget {
 
 impl LibraryWidget {
     // searchable tags, by key:value
+    // TODO: add autocomplete suggestions for tag keys and known library values
     const TAG_KEYS: [&str; 5] = ["title", "artist", "album", "genre", "date"];
     const ROW_MARGIN: u16 = 1;
 
