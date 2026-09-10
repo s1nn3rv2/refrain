@@ -68,3 +68,35 @@ pub fn cache_path(track_path: &Path, dir: &str, ext: &str) -> PathBuf {
         .join(dir)
         .join(format!("{hash:016x}.{ext}"))
 }
+
+/// Splits a query on whitespace, except inside double quotes, so a tag value can hold spaces. For
+/// example: `artist:"best artist ever" edm` -> ["artist:best artist ever", "edm"]
+// TODO: we do not handle unfinished quotes yet, but I don't know how to properly deal with
+// those yet
+pub fn tokenize(query: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut quoted = false; // keep track of quotes
+
+    for c in query.chars() {
+        match c {
+            '"' => {
+                quoted = !quoted;
+                current.push('"'); // keep the quote
+            },
+            c if c.is_whitespace() && !quoted => {
+                if !current.is_empty() {
+                    tokens.push(std::mem::take(&mut current));
+                }
+            },
+            // otherwise, we append the character to current
+            c => current.push(c),
+        }
+    }
+
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+
+    tokens
+}

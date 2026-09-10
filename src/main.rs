@@ -97,9 +97,9 @@ impl App {
         Self {
             active_view: ActiveView::Library,
             quit: false,
+            sidebar: SidebarWidget::new(&library),
             library,
             library_widget,
-            sidebar: SidebarWidget::new(),
             player: AudioPlayer::new().expect("Could not create audio player"),
             search: TextInput::new("Search", "Press '/' to search..."),
             tasks: TaskManager::new(picker, events_tx),
@@ -172,7 +172,7 @@ impl App {
         .areas(frame.area());
 
         let [sidebar_area, library_area] =
-            Layout::horizontal([Constraint::Percentage(20), Constraint::Fill(1)]).areas(main_area);
+            Layout::horizontal([Constraint::Max(40), Constraint::Fill(1)]).areas(main_area);
 
         self.sidebar.render(
             self.is_pane_focused(ActiveView::Sidebar),
@@ -230,6 +230,12 @@ impl App {
                 InputAction::Changed => {
                     self.library_widget
                         .update_filter(&self.library, &self.search.value);
+                    self.sidebar.update_from_filtered(
+                        &self.library,
+                        &self
+                            .library_widget
+                            .filtered_indices,
+                    );
                 },
                 InputAction::Submitted | InputAction::Escaped => {
                     self.search.unfocus();
@@ -267,7 +273,18 @@ impl App {
                     .sidebar
                     .handle_key_event(key_event)
                 {
-                    Some(SidebarAction::ApplyFilter { key, value }) => {},
+                    Some(SidebarAction::ApplyFilter { key, value }) => {
+                        self.search
+                            .set_tag(key, value.as_deref());
+                        self.library_widget
+                            .update_filter(&self.library, &self.search.value);
+                        self.sidebar.update_from_filtered(
+                            &self.library,
+                            &self
+                                .library_widget
+                                .filtered_indices,
+                        );
+                    },
                     None => {},
                 }
             },

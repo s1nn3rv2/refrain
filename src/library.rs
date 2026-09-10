@@ -109,6 +109,14 @@ impl Track {
         Self::format_artists(&self.artists)
     }
 
+    pub fn individual_artists(&self) -> Vec<&str> {
+        self.artists
+            .split(';')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect()
+    }
+
     /// Returns a search haystack string, containing all searchable fields
     // We do not keep it in search memory, it has derived fields and is cheap to build so no
     // need to keep it in cache, although in future perhaps we could make it be in cache for

@@ -16,7 +16,7 @@ use ratatui::{
 };
 use ratatui_image::{Image, protocol::Protocol};
 
-use crate::{library::LibraryState, task::THUMB_SIZE};
+use crate::{library::LibraryState, task::THUMB_SIZE, util};
 
 pub enum LibraryAction {
     Play(usize), // track index in library.tracks
@@ -255,7 +255,7 @@ impl LibraryWidget {
         }
 
         // separate tags (genre:xxx, artist:xxx, alum:xxx)
-        let tokens = Self::tokenize(query);
+        let tokens = util::tokenize(query);
         let mut tags = Vec::new();
         // all non-tag words
         let mut generic_terms = Vec::new();
@@ -263,10 +263,14 @@ impl LibraryWidget {
         for token in &tokens {
             match token.split_once(':') {
                 Some((key, val)) if !val.is_empty() && Self::TAG_KEYS.contains(&key) => {
-                    tags.push((
-                        key,
-                        Pattern::parse(val, CaseMatching::Smart, Normalization::Smart),
-                    ))
+                    // strip surrounding quotes, for example: `"EDM"` -> `'EDM'`
+                    let clean_val = val.trim_matches('"');
+                    if !clean_val.is_empty() {
+                        tags.push((
+                            key,
+                            Pattern::parse(clean_val, CaseMatching::Smart, Normalization::Smart),
+                        ))
+                    }
                 },
                 _ => generic_terms.push(token.as_str()),
             }
@@ -348,34 +352,5 @@ impl LibraryWidget {
         } else {
             self.state.select(Some(0));
         }
-    }
-
-    /// Splits a query on whitespace, except inside double quotes, so a tag value can hold spaces. For
-    /// example: `artist:"best artist ever" edm` -> ["artist:best artist ever", "edm"]
-    // TODO: we do not handle unfinished quotes yet, but I don't know how to properly deal with
-    // those yet
-    fn tokenize(query: &str) -> Vec<String> {
-        let mut tokens = Vec::new();
-        let mut current = String::new();
-        let mut quoted = false; // keep track of quotes
-
-        for c in query.chars() {
-            match c {
-                '"' => quoted = !quoted,
-                c if c.is_whitespace() && !quoted => {
-                    if !current.is_empty() {
-                        tokens.push(std::mem::take(&mut current));
-                    }
-                },
-                // otherwise, we append the character to current
-                c => current.push(c),
-            }
-        }
-
-        if !current.is_empty() {
-            tokens.push(current);
-        }
-
-        tokens
     }
 }
