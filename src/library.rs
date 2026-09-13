@@ -60,14 +60,29 @@ impl Track {
                 if let Some(t) = tag.title().as_deref() {
                     title = t.to_string();
                 }
-                if let Some(a) = tag.artist().as_deref() {
-                    artists = a.to_string()
-                }
+                // Sometimes, tracks have multiple artists parsed as multiple Artist tags, like:
+                // Artist = 'Artist1'
+                // Artist = 'Artist2'
+                // Instead of the usual
+                // Artist = 'Artist1;Artist2'
+                // So we reconcile those to a single string joined with ;
+                let parsed_artists: Vec<&str> = tag
+                    .get_strings(ItemKey::TrackArtist)
+                    .collect();
+                artists = if !parsed_artists.is_empty() {
+                    parsed_artists.join(";")
+                } else {
+                    artists
+                };
+                // same situation as above!
+                let parsed_album_artists: Vec<&str> = tag
+                    .get_strings(ItemKey::AlbumArtist)
+                    .chain(tag.get_strings(ItemKey::AlbumArtists))
+                    .collect();
+                album_artists =
+                    (!parsed_album_artists.is_empty()).then(|| parsed_album_artists.join(";"));
                 if let Some(al) = tag.album().as_deref() {
                     album = Some(al.to_string());
-                }
-                if let Some(aa) = tag.get_string(ItemKey::AlbumArtists) {
-                    album_artists = Some(aa.to_string());
                 }
 
                 track_number = tag.track();
