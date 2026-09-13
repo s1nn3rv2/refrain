@@ -16,7 +16,12 @@ use ratatui::{
 };
 use ratatui_image::{Image, protocol::Protocol};
 
-use crate::{library::LibraryState, task::THUMB_SIZE, util};
+use crate::{
+    library::LibraryState,
+    task::THUMB_SIZE,
+    ui::track::{ROW_MARGIN, track_table_header, track_to_row},
+    util,
+};
 
 // TODO: change usize to Track to avoid any indexing errors? will see though if its necessary
 pub enum LibraryAction {
@@ -47,7 +52,6 @@ impl LibraryWidget {
     // searchable tags, by key:value
     // TODO: add autocomplete suggestions for tag keys and known library values
     const TAG_KEYS: [&str; 5] = ["title", "artist", "album", "genre", "date"];
-    const ROW_MARGIN: u16 = 1;
 
     pub fn new(library: &LibraryState) -> Self {
         let mut widget = Self::default();
@@ -95,56 +99,14 @@ impl LibraryWidget {
             Style::default().fg(Color::DarkGray)
         };
 
-        let header = Row::new([
-            Cell::from(""),
-            Cell::from("Artists"),
-            Cell::from("Title"),
-            Cell::from("Album"),
-            Cell::from(Line::from("Length").right_aligned()), // cell has no right_aligned lol
-        ])
-        .style(Style::new().bold());
+        let header = track_table_header().style(Style::new().bold());
         // track number & disc number should only display in context of album, not on themselves
         // (could add an option to config for that perhaps if someone wants that)
         let rows: Vec<Row> = self
             .filtered_indices
             .iter()
             .filter_map(|&idx| library.tracks.get(idx))
-            .map(|track| {
-                let duration_secs = track.length.as_secs();
-                let duration_display =
-                    format!("{:02}:{:02}", duration_secs / 60, duration_secs % 60);
-
-                let centered_artist =
-                    Text::from(vec![Line::from(""), Line::from(track.formatted_artists())]);
-
-                let centered_title =
-                    Text::from(vec![Line::from(""), Line::from(track.title.as_str())]);
-
-                let centered_album = Text::from(vec![
-                    Line::from(""),
-                    Line::from(
-                        track
-                            .album
-                            .as_deref()
-                            .unwrap_or(""),
-                    ),
-                ]);
-
-                let centered_duration = Text::from(vec![
-                    Line::from(""),
-                    Line::from(duration_display).right_aligned(),
-                ]);
-
-                Row::new([
-                    Cell::from(""), // for cover art
-                    Cell::from(centered_artist),
-                    Cell::from(centered_title),
-                    Cell::from(centered_album),
-                    Cell::from(centered_duration),
-                ])
-                .height(THUMB_SIZE.height)
-                .bottom_margin(Self::ROW_MARGIN)
-            })
+            .map(|track| track_to_row(track))
             .collect();
 
         let widths = [
@@ -186,7 +148,7 @@ impl LibraryWidget {
             .skip(offset)
             .enumerate()
         {
-            let y = first_row_y + screen_row as u16 * (THUMB_SIZE.height + Self::ROW_MARGIN);
+            let y = first_row_y + screen_row as u16 * (THUMB_SIZE.height + ROW_MARGIN);
             if y + THUMB_SIZE.height > inner.y + inner.height {
                 break;
             }
