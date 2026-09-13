@@ -18,8 +18,11 @@ use ratatui_image::{Image, protocol::Protocol};
 
 use crate::{library::LibraryState, task::THUMB_SIZE, util};
 
+// TODO: change usize to Track to avoid any indexing errors? will see though if its necessary
 pub enum LibraryAction {
     Play(usize), // track index in library.tracks
+    AddToQueue(usize),
+    PlayNext(usize),
 }
 
 pub struct LibraryWidget {
@@ -232,6 +235,12 @@ impl LibraryWidget {
             KeyCode::Char('l') | KeyCode::Enter => self
                 .selected_track_index()
                 .map(LibraryAction::Play),
+            KeyCode::Char('a') => self
+                .selected_track_index()
+                .map(LibraryAction::AddToQueue),
+            KeyCode::Char('A') => self
+                .selected_track_index()
+                .map(LibraryAction::PlayNext),
             _ => None,
         }
     }

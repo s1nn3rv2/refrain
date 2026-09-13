@@ -66,4 +66,13 @@ impl AudioPlayer {
     pub fn elapsed(&self) -> Duration {
         self.player.get_pos()
     }
+
+    pub fn is_finished(&self) -> bool {
+        self.current_track.is_some() && self.player.empty()
+    }
+
+    pub fn stop(&mut self) {
+        self.player.stop();
+        self.current_track = None;
+    }
 }

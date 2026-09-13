@@ -1,6 +1,7 @@
 mod audio;
 mod cover;
 mod library;
+mod queue;
 mod task;
 mod ui;
 mod util;
@@ -26,7 +27,8 @@ use ratatui_image::{picker::Picker, protocol::Protocol};
 
 use crate::{
     audio::AudioPlayer,
-    library::LibraryState,
+    library::{LibraryState, Track},
+    queue::QueueManager,
     task::TaskManager,
     ui::{
         input::{InputAction, TextInput},
@@ -57,6 +59,7 @@ pub struct App {
     library_widget: LibraryWidget,
     sidebar: SidebarWidget,
     player: AudioPlayer,
+    queue: QueueManager,
     search: TextInput,
     tasks: TaskManager,
     waveform: Option<WaveformData>,
@@ -101,6 +104,7 @@ impl App {
             library,
             library_widget,
             player: AudioPlayer::new().expect("Could not create audio player"),
+            queue: QueueManager::new(),
             search: TextInput::new("Search", "Press '/' to search..."),
             tasks: TaskManager::new(picker, events_tx),
             cover: None,
@@ -137,6 +141,8 @@ impl App {
                 Err(RecvTimeoutError::Timeout) => {},
                 Err(RecvTimeoutError::Disconnected) => self.quit = true,
             }
+
+            self.check_track_finished();
         }
 
         Ok(())
@@ -253,6 +259,9 @@ impl App {
                 self.library_widget
                     .update_filter(&self.library, &self.search.value);
             },
+            KeyCode::Char('n') | KeyCode::Char('>') => {
+                self.play_next_track();
+            },
             KeyCode::Char('/') => {
                 self.search.focus();
                 return;
@@ -293,21 +302,83 @@ impl App {
                     .library_widget
                     .handle_key_event(key_event)
                 {
-                    Some(LibraryAction::Play(idx)) => self.play_track(idx),
+                    Some(LibraryAction::Play(idx)) => self.play(idx),
+                    Some(LibraryAction::AddToQueue(idx)) => self.add_to_queue(idx),
+                    Some(LibraryAction::PlayNext(idx)) => self.play_next(idx),
                     None => {},
                 }
             },
         }
     }
 
-    // Later on, we should pass Track instead of an index to avoid any bugs on rescans etc
-    fn play_track(&mut self, index: usize) {
-        if let Some(track) = self.library.tracks.get(index)
-            && self.player.play(track).is_ok()
+    // -- UI actions
+
+    fn play(&mut self, idx: usize) {
+        if let Some(track) = self
+            .library
+            .tracks
+            .get(idx)
+            .cloned()
         {
+            self.play_track(track);
+        }
+    }
+
+    fn add_to_queue(&mut self, idx: usize) {
+        if let Some(track) = self
+            .library
+            .tracks
+            .get(idx)
+            .cloned()
+        {
+            if self
+                .player
+                .current_track()
+                .is_none()
+            {
+                self.play_track(track);
+            } else {
+                self.queue.push_back(track);
+            }
+        }
+    }
+
+    fn play_next(&mut self, idx: usize) {
+        if let Some(track) = self
+            .library
+            .tracks
+            .get(idx)
+            .cloned()
+        {
+            if self
+                .player
+                .current_track()
+                .is_none()
+            {
+                self.play_track(track);
+            } else {
+                self.queue.push_front(track);
+            }
+        }
+    }
+
+    // --
+
+    fn play_track(&mut self, track: Track) {
+        if self.player.play(&track).is_ok() {
             self.waveform = None;
             self.cover = None;
             self.tasks.set_track(&track.path);
+        }
+    }
+
+    fn play_next_track(&mut self) {
+        if let Some(next_track) = self.queue.pop_next() {
+            self.play_track(next_track);
+        } else {
+            self.player.stop();
+            self.waveform = None;
+            self.cover = None;
         }
     }
 
@@ -320,6 +391,12 @@ impl App {
 
     fn exit(&mut self) {
         self.quit = true;
+    }
+
+    fn check_track_finished(&mut self) {
+        if self.player.is_finished() {
+            self.play_next_track();
+        }
     }
 }
 
