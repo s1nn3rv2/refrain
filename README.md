@@ -20,7 +20,7 @@ Built with Rust and Ratatui.
 - [x] Extremely fast - scanning 1800+ songs takes less than a second, covers load on demand
 - [ ] Tag editing - allows you to edit tags on songs
 - [ ] MPRIS support - allows you to control and see the current song in your system's media player 
-- [ ] Queue management
+- [x] Queue management - add tracks, play next, view and manage via collapsible drawer
 - [ ] Context-aware shuffle - knows your context, whether you're in an album, genre or everything, it knows what songs to pick from
 - [ ] Synced lyrics - automatically fetches and scrolls lyrics 
 - [ ] Gapless playback - seamless track transitions
@@ -28,16 +28,30 @@ Built with Rust and Ratatui.
 
 ## Keybindings
 
+### Navigation & Playback
+
 | Key | Action |
 |:---|:---|
 | `j` / `Down` | Move down |
 | `k` / `Up` | Move up |
+| `Tab` / `Shift + Tab` | Cycle focus between panes (Sidebar, Library, Queue) |
 | `Enter` / `l` | Play selected track |
 | `p` | Play / Pause |
+| `n` / `>` | Next track |
+| `u` | Toggle queue drawer open / closed |
 | `/` | Open fuzzy search |
 | `r` | Rescan `~/Music` directory |
 | `Esc` / `Enter` | Exit search mode |
 | `q` | Quit |
+
+### Queue Actions
+
+| Key | Context | Action |
+|:---|:---|:---|
+| `a` | Library | Add selected track to queue |
+| `A` (`Shift + a`) | Library | Play selected track next (top of queue) |
+| `Enter` / `l` | Queue | Play selected queued track |
+| `d` | Queue | Remove selected track from queue |
 
 ---
 
