@@ -15,7 +15,7 @@ use ratatui_image::protocol::Protocol;
 use crate::{
     queue::QueueManager,
     task::THUMB_SIZE,
-    ui::track::{ROW_MARGIN, render_visible_thumbnails},
+    ui::track::{ROW_MARGIN, render_visible_thumbnails, track_to_compact_row},
     util::DurationExt,
 };
 
@@ -79,47 +79,17 @@ impl QueueWidget {
 
         let inner = block.inner(area);
 
+        // num of chars available for text in the card
+        let text_width = inner
+            .width
+            .saturating_sub(THUMB_SIZE.width + 1) as usize; // + 1 for column spacing
+
         let rows: Vec<Row> = queue
             .user_queue
             .iter()
-            .map(|track| {
-                let time = track.length.format_time();
-                let album_name = track
-                    .album
-                    .as_deref()
-                    .unwrap_or("Single");
-
-                // Line 1: Title (bold)
-                let line_title = Line::from(Span::styled(
-                    track.title.as_str(),
-                    Style::default().add_modifier(Modifier::BOLD),
-                ));
-
-                // Line 2: Artist (light gray)
-                let line_artist = Line::from(Span::styled(
-                    track.formatted_artists(),
-                    Style::default().fg(Color::Gray),
-                ));
-
-                // Line 3: Album (dark gray) with Duration
-                let line_album = Line::from(vec![
-                    Span::styled(album_name, Style::default().fg(Color::DarkGray)),
-                    Span::raw("  "),
-                    Span::styled(time, Style::default().fg(Color::DarkGray)),
-                ]);
-
-                let card_text = Text::from(vec![line_title, line_artist, line_album]);
-
-                Row::new([
-                    Cell::from(""),        // Cell 1: reserved for 3-line cover art
-                    Cell::from(card_text), // Cell 2: stacked 3-line details
-                ])
-                .height(THUMB_SIZE.height)
-                .bottom_margin(ROW_MARGIN)
-            })
+            .map(|track| track_to_compact_row(track, text_width))
             .collect();
 
-        // 2 columns: thumbnail width (7) + remaining drawer width
         let widths = [Constraint::Length(THUMB_SIZE.width), Constraint::Fill(1)];
 
         let table = Table::new(rows, widths)

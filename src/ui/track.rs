@@ -4,12 +4,14 @@ use lru::LruCache;
 use ratatui::{
     buffer::Buffer,
     layout::{Rect, Size},
-    text::{Line, Text},
+    style::{Color, Modifier, Style},
+    text::{Line, Span, Text},
     widgets::{Cell, Row, Widget},
 };
 use ratatui_image::{Image, protocol::Protocol};
+use unicode_truncate::UnicodeTruncateStr;
 
-use crate::{library::Track, task::THUMB_SIZE};
+use crate::{library::Track, task::THUMB_SIZE, util::DurationExt};
 
 pub const ROW_MARGIN: u16 = 1;
 
@@ -55,6 +57,40 @@ pub fn track_to_row(track: &Track) -> Row<'_> {
     ])
     .height(THUMB_SIZE.height)
     .bottom_margin(ROW_MARGIN)
+}
+
+pub fn track_to_compact_row<'a>(track: &'a Track, width: usize) -> Row<'a> {
+    let time = track.length.format_time();
+    let album_name = track
+        .album
+        .as_deref()
+        .unwrap_or("Single");
+
+    let line_title = Line::from(Span::styled(
+        track.title.as_str(),
+        Style::default().add_modifier(Modifier::BOLD),
+    ));
+
+    let line_artist = Line::from(Span::styled(
+        track.formatted_artists(),
+        Style::default().fg(Color::Gray),
+    ));
+
+    let max_album = width.saturating_sub(time.len() + 1);
+    let (album_display, album_width) = album_name.unicode_truncate(max_album);
+
+    let pad = width.saturating_sub(album_width + time.len());
+    let line_album = Line::from(vec![
+        Span::styled(album_display, Style::default().fg(Color::DarkGray)),
+        Span::raw(" ".repeat(pad)),
+        Span::styled(time, Style::default().fg(Color::DarkGray)),
+    ]);
+
+    let card_text = Text::from(vec![line_title, line_artist, line_album]);
+
+    Row::new([Cell::from(""), Cell::from(card_text)])
+        .height(THUMB_SIZE.height)
+        .bottom_margin(ROW_MARGIN)
 }
 
 pub fn render_visible_thumbnails<'a, I>(
