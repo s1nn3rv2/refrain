@@ -19,7 +19,7 @@ use ratatui_image::{Image, protocol::Protocol};
 use crate::{
     library::LibraryState,
     task::THUMB_SIZE,
-    ui::track::{ROW_MARGIN, track_table_header, track_to_row},
+    ui::track::{ROW_MARGIN, render_visible_thumbnails, track_table_header, track_to_row},
     util,
 };
 
@@ -138,50 +138,21 @@ impl LibraryWidget {
 
         StatefulWidget::render(table, area, buf, &mut self.state);
 
-        let first_row_y = inner.y + 1;
-        let first_row_x = inner.x;
-        let offset = self.state.offset(); // scroll position, index of first visible row
-
-        for (screen_row, &track_index) in self
+        let paths = self
             .filtered_indices
             .iter()
-            .skip(offset)
-            .enumerate()
-        {
-            let y = first_row_y + screen_row as u16 * (THUMB_SIZE.height + ROW_MARGIN);
-            if y + THUMB_SIZE.height > inner.y + inner.height {
-                break;
-            }
+            .filter_map(|&idx| library.tracks.get(idx))
+            .map(|t| t.path.as_path());
 
-            let Some(track) = library.tracks.get(track_index) else {
-                continue;
-            };
-
-            let rect = Rect {
-                x: first_row_x,
-                y,
-                width: THUMB_SIZE.width,
-                height: THUMB_SIZE.height,
-            };
-
-            match thumbnails.get(&track.path) {
-                // cached at size we want, draw
-                Some(Some((size, protocol))) if *size == THUMB_SIZE => {
-                    Image::new(protocol).render(rect, buf);
-                },
-                // cached at other size, draw it and then ask for rebuild
-                Some(Some((_, protocol))) => {
-                    Image::new(protocol)
-                        .allow_clipping(true)
-                        .render(rect, buf);
-                    visible.push((track.path.clone(), THUMB_SIZE));
-                },
-                // track has no art
-                Some(None) => {},
-                // never seen, ask for it
-                None => visible.push((track.path.clone(), THUMB_SIZE)),
-            }
-        }
+        render_visible_thumbnails(
+            paths,
+            self.state.offset(),
+            true,
+            inner,
+            thumbnails,
+            visible,
+            buf,
+        );
     }
 
     pub fn handle_key_event(&mut self, key_event: KeyEvent) -> Option<LibraryAction> {

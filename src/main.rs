@@ -33,16 +33,18 @@ use crate::{
     ui::{
         input::{InputAction, TextInput},
         library::{LibraryAction, LibraryWidget},
+        queue::{QueueAction, QueueWidget},
         sidebar::{SidebarAction, SidebarWidget},
         transport::{TransportAction, TransportState},
     },
     waveform::WaveformData,
 };
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone, Copy)]
 pub enum ActiveView {
     Library,
     Sidebar,
+    Queue,
 }
 
 pub enum AppEvent {
@@ -55,11 +57,17 @@ pub enum AppEvent {
 pub struct App {
     active_view: ActiveView,
     transport: TransportState,
+
     library: LibraryState,
     library_widget: LibraryWidget,
+
     sidebar: SidebarWidget,
     player: AudioPlayer,
+
     queue: QueueManager,
+    queue_widget: QueueWidget,
+    show_queue: bool,
+
     search: TextInput,
     tasks: TaskManager,
     waveform: Option<WaveformData>,
@@ -105,6 +113,8 @@ impl App {
             library_widget,
             player: AudioPlayer::new().expect("Could not create audio player"),
             queue: QueueManager::new(),
+            queue_widget: QueueWidget::new(),
+            show_queue: true,
             search: TextInput::new("Search", "Press '/' to search..."),
             tasks: TaskManager::new(picker, events_tx),
             cover: None,
@@ -169,6 +179,39 @@ impl App {
         }
     }
 
+    /// Returns all visible views, for example if queue is currently hidden it only returns Sidebar
+    /// and Library
+    fn visible_views(&self) -> Vec<ActiveView> {
+        let mut views = vec![ActiveView::Sidebar, ActiveView::Library];
+
+        if self.show_queue {
+            views.push(ActiveView::Queue);
+        }
+
+        views
+    }
+
+    fn cycle_focus(&mut self, forward: bool) {
+        let views = self.visible_views();
+        if views.is_empty() {
+            return;
+        }
+
+        let current_pos = views
+            .iter()
+            .position(|&v| v == self.active_view)
+            .unwrap_or(0);
+
+        // so it wraps around
+        let next_pos = if forward {
+            (current_pos + 1) % views.len()
+        } else {
+            (current_pos + views.len() - 1) % views.len()
+        };
+
+        self.active_view = views[next_pos];
+    }
+
     fn draw(&mut self, frame: &mut Frame) {
         let [search_area, main_area, transport_area] = Layout::vertical([
             Constraint::Length(1),
@@ -177,8 +220,18 @@ impl App {
         ])
         .areas(frame.area());
 
-        let [sidebar_area, library_area] =
+        // queue can show and hide, so we must split this into library_area (sidebar + library) and
+        // queue_area
+        let [sidebar_area, content_area] =
             Layout::horizontal([Constraint::Max(40), Constraint::Fill(1)]).areas(main_area);
+
+        let (library_area, queue_area) = if self.show_queue {
+            let [lib, q] =
+                Layout::horizontal([Constraint::Fill(1), Constraint::Max(40)]).areas(content_area);
+            (lib, Some(q))
+        } else {
+            (content_area, None)
+        };
 
         self.sidebar.render(
             self.is_pane_focused(ActiveView::Sidebar),
@@ -197,6 +250,17 @@ impl App {
             library_area,
             frame.buffer_mut(),
         );
+
+        if let Some(area) = queue_area {
+            self.queue_widget.render(
+                self.is_pane_focused(ActiveView::Queue),
+                &self.queue,
+                &mut self.thumbnails,
+                &mut self.visible,
+                area,
+                frame.buffer_mut(),
+            );
+        }
 
         self.transport.render(
             &self.player,
@@ -262,15 +326,17 @@ impl App {
             KeyCode::Char('n') | KeyCode::Char('>') => {
                 self.play_next_track();
             },
+            KeyCode::Char('u') => self.show_queue = !self.show_queue,
             KeyCode::Char('/') => {
                 self.search.focus();
                 return;
             },
             KeyCode::Tab => {
-                self.active_view = match self.active_view {
-                    ActiveView::Sidebar => ActiveView::Library,
-                    _ => ActiveView::Sidebar,
-                };
+                self.cycle_focus(true);
+                return;
+            },
+            KeyCode::BackTab => {
+                self.cycle_focus(false);
                 return;
             },
             _ => {},
@@ -302,9 +368,19 @@ impl App {
                     .library_widget
                     .handle_key_event(key_event)
                 {
-                    Some(LibraryAction::Play(idx)) => self.play(idx),
-                    Some(LibraryAction::AddToQueue(idx)) => self.add_to_queue(idx),
-                    Some(LibraryAction::PlayNext(idx)) => self.play_next(idx),
+                    Some(LibraryAction::Play(idx)) => self.library_play(idx),
+                    Some(LibraryAction::AddToQueue(idx)) => self.library_add_to_queue(idx),
+                    Some(LibraryAction::PlayNext(idx)) => self.library_play_next(idx),
+                    None => {},
+                }
+            },
+            ActiveView::Queue => {
+                match self
+                    .queue_widget
+                    .handle_key_event(key_event)
+                {
+                    Some(QueueAction::Play(idx)) => self.queue_play(idx),
+                    Some(QueueAction::Remove(idx)) => self.queue_remove(idx),
                     None => {},
                 }
             },
@@ -313,7 +389,7 @@ impl App {
 
     // -- UI actions
 
-    fn play(&mut self, idx: usize) {
+    fn library_play(&mut self, idx: usize) {
         if let Some(track) = self
             .library
             .tracks
@@ -324,7 +400,7 @@ impl App {
         }
     }
 
-    fn add_to_queue(&mut self, idx: usize) {
+    fn library_add_to_queue(&mut self, idx: usize) {
         if let Some(track) = self
             .library
             .tracks
@@ -343,7 +419,7 @@ impl App {
         }
     }
 
-    fn play_next(&mut self, idx: usize) {
+    fn library_play_next(&mut self, idx: usize) {
         if let Some(track) = self
             .library
             .tracks
@@ -359,6 +435,29 @@ impl App {
             } else {
                 self.queue.push_front(track);
             }
+        }
+    }
+
+    fn queue_play(&mut self, idx: usize) {
+        // remove track from queue and play it
+        if let Some(track) = self.queue.user_queue.remove(idx) {
+            self.play_track(track);
+        }
+    }
+
+    fn queue_remove(&mut self, idx: usize) {
+        self.queue.user_queue.remove(idx);
+
+        // clamp queue selection so cursor doesnt suddenly disappear
+        let len = self.queue.user_queue.len();
+        if len == 0 {
+            self.queue_widget
+                .state
+                .select(None);
+        } else if idx >= len {
+            self.queue_widget
+                .state
+                .select(Some(len - 1));
         }
     }
 
