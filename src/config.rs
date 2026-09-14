@@ -3,9 +3,9 @@ use std::{env::home_dir, path::PathBuf, sync::OnceLock};
 use color_eyre::eyre::Context;
 use serde::{Deserialize, Serialize};
 
-static CONFIG: OnceLock<Config> = OnceLock::new();
+// TODO: implement hot-reload
 
-// TODO: Support ~ symbol in config
+static CONFIG: OnceLock<Config> = OnceLock::new();
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
@@ -56,8 +56,15 @@ impl Config {
         let content = std::fs::read_to_string(&path)
             .wrap_err_with(|| format!("Failed to read config file at {:?}", path))?;
 
-        let config: Config = toml::from_str(&content)
+        let mut config: Config = toml::from_str(&content)
             .wrap_err(format!("Failed to parse config file at {:?}", path))?;
+
+        // could use shellexpand in future if needed, for now this suffices
+        if let Ok(suffix) = config.music_dir.strip_prefix("~") {
+            config.music_dir = dirs::home_dir()
+                .map(|h| h.join(suffix))
+                .unwrap_or(config.music_dir);
+        }
 
         Ok(config)
     }
