@@ -29,7 +29,7 @@ use ratatui_image::{picker::Picker, protocol::Protocol};
 use crate::{
     audio::AudioPlayer,
     config::Config,
-    library::{LibraryState, Track},
+    library::{LibraryState, Track, TrackTags},
     queue::QueueManager,
     task::TaskManager,
     ui::{
@@ -306,7 +306,9 @@ impl App {
         if let Some(editor) = &mut self.tag_editor {
             match editor.handle_key_event(key_event) {
                 Some(TagEditorAction::Cancel) => self.tag_editor = None,
-                Some(TagEditorAction::Save) => todo!(),
+                Some(TagEditorAction::Save) => {
+                    let _ = self.tag_editor_save_edited_tags();
+                },
                 None => {},
             }
             return;
@@ -518,6 +520,75 @@ impl App {
                 .state
                 .select(Some(idx + 1));
         }
+    }
+
+    fn tag_editor_save_edited_tags(&mut self) -> color_eyre::Result<()> {
+        let Some(editor) = self.tag_editor.take() else {
+            return Ok(());
+        };
+        let Some(track) = self
+            .library
+            .tracks
+            .get_mut(editor.track_idx)
+        else {
+            return Ok(());
+        };
+
+        let album = (!editor
+            .album
+            .value
+            .trim()
+            .is_empty())
+        .then(|| editor.album.value);
+        let album_artists = (!editor
+            .album_artists
+            .value
+            .trim()
+            .is_empty())
+        .then(|| editor.album_artists.value);
+        let genre = (!editor
+            .genre
+            .value
+            .trim()
+            .is_empty())
+        .then(|| editor.genre.value);
+        let date = (!editor.date.value.trim().is_empty()).then(|| editor.date.value);
+        let track_number = editor
+            .track_number
+            .value
+            .trim()
+            .parse::<u32>()
+            .ok();
+        let disc_number = editor
+            .disc_number
+            .value
+            .trim()
+            .parse::<u32>()
+            .ok();
+
+        track.save_tags(TrackTags {
+            title: editor.title.value,
+            artists: editor.artists.value,
+            album,
+            album_artists,
+            track_number,
+            disc_number,
+            genre,
+            date,
+        })?;
+
+        let _ = self.library.save_cache();
+
+        self.library_widget
+            .update_filter(&self.library, &self.search.input.value);
+        self.sidebar.update_from_filtered(
+            &self.library,
+            &self
+                .library_widget
+                .filtered_indices,
+        );
+
+        Ok(())
     }
 
     // --

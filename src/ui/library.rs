@@ -11,10 +11,9 @@ use ratatui::{
     layout::{Constraint, Rect, Size},
     style::{Color, Modifier, Style},
     symbols::border,
-    text::{Line, Text},
-    widgets::{Block, Cell, Padding, Row, StatefulWidget, Table, TableState, Widget},
+    widgets::{Block, Padding, Row, StatefulWidget, Table, TableState},
 };
-use ratatui_image::{Image, protocol::Protocol};
+use ratatui_image::protocol::Protocol;
 
 use crate::{
     library::LibraryState,
@@ -245,17 +244,23 @@ impl LibraryWidget {
                 // check if tags on this track match our tags from the search query
                 let all_tags_match = tags.iter().all(|(key, pat)| {
                     let field: &str = match *key {
-                        "title" => &track.title,
+                        "title" => &track.tags.title,
                         "genre" => track
+                            .tags
                             .genre
                             .as_deref()
                             .unwrap_or(""),
-                        "artist" => &track.formatted_artists(),
+                        "artist" => &track.tags.formatted_artists(),
                         "album" => track
+                            .tags
                             .album
                             .as_deref()
                             .unwrap_or(""),
-                        "date" => track.date.as_deref().unwrap_or(""),
+                        "date" => track
+                            .tags
+                            .date
+                            .as_deref()
+                            .unwrap_or(""),
                         // unreachable
                         _ => return false,
                     };
@@ -269,7 +274,9 @@ impl LibraryWidget {
 
                 if let Some(ref pat) = generic_pat {
                     haystack_buf.clear();
-                    track.write_search_haystack(&mut haystack_buf);
+                    track
+                        .tags
+                        .write_search_haystack(&mut haystack_buf);
 
                     let score = pat.score(
                         Utf32Str::new(&haystack_buf, &mut str_buf),

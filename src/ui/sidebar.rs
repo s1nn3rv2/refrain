@@ -1,7 +1,4 @@
-use std::cmp::Reverse;
-
 use crossterm::event::{KeyCode, KeyEvent};
-use nucleo_matcher::Matcher;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Layout, Rect},
@@ -24,12 +21,6 @@ pub enum SidebarAction {
     },
 }
 
-pub enum SidebarTab {
-    Genres,
-    Albums,
-    Artists,
-}
-
 pub struct SidebarWidget {
     selected_tab: usize,
     list_state: ListState,
@@ -39,8 +30,6 @@ pub struct SidebarWidget {
     genres: Vec<String>,
     albums: Vec<String>,
     artists: Vec<String>,
-    pub filtered_indices: Vec<usize>, // indices into current_items()
-    matcher: Matcher,
 }
 
 impl SidebarWidget {
@@ -53,8 +42,6 @@ impl SidebarWidget {
             genres: Vec::new(),
             albums: Vec::new(),
             artists: Vec::new(),
-            filtered_indices: Vec::new(),
-            matcher: Matcher::default(),
         };
         widget.list_state.select(Some(0));
         // show all
@@ -91,21 +78,21 @@ impl SidebarWidget {
 
         for &idx in filtered_indices {
             if let Some(track) = library.tracks.get(idx) {
-                if let Some(g) = &track.genre {
+                if let Some(g) = &track.tags.genre {
                     let trimmed = g.trim();
                     if !trimmed.is_empty() {
                         self.genres
                             .push(trimmed.to_string());
                     }
                 }
-                if let Some(a) = &track.album {
+                if let Some(a) = &track.tags.album {
                     let trimmed = a.trim();
                     if !trimmed.is_empty() {
                         self.albums
                             .push(trimmed.to_string());
                     }
                 }
-                for artist in track.individual_artists() {
+                for artist in track.tags.individual_artists() {
                     self.artists
                         .push(artist.to_string());
                 }

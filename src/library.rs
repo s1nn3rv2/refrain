@@ -7,25 +7,85 @@ use std::{
 
 use color_eyre::eyre::Context;
 use lofty::{
+    config::WriteOptions,
     file::{AudioFile, TaggedFileExt},
-    tag::{Accessor as _, ItemKey},
+    tag::{Accessor as _, ItemKey, Tag, TagExt},
 };
 
 use crate::{config::Config, util};
 
 #[derive(Clone)]
-pub struct Track {
-    pub path: PathBuf,
-
-    /// tags
+pub struct TrackTags {
     pub title: String,
-    artists: String, // can have multiple, separated by a symbol (like ;)
+    pub artists: String, // can have multiple, separated by a symbol (like ;),
     pub album: Option<String>,
-    album_artists: Option<String>, // same story as artists
+    pub album_artists: Option<String>, // same story as artists
     pub track_number: Option<u32>,
     pub disc_number: Option<u32>,
     pub genre: Option<String>,
     pub date: Option<String>, // stored as string due to variety of different formats people use
+}
+
+impl TrackTags {
+    /// Returns artists in a nice format ("Artist1;Artist2" -> "Artist1, Artist2")
+    pub fn format_artists(raw: &str) -> String {
+        raw.split(';')
+            .map(|s| s.trim()) // remove any remaining whitespaces, so "Artist1; Artist2" and "Artist1;Artist2" behave the same
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+
+    /// Formatted as "Artist 1, Artist 2, Artist 3"
+    pub fn formatted_artists(&self) -> String {
+        Self::format_artists(&self.artists)
+    }
+
+    // Why separation between formatted and unformatted and why not just make artists public? I
+    // don't wanna cause confusion, since artists are stored internally as separated with ;.
+    // Separate explicit function for formatted and unformatted artists make it more clear!
+
+    /// Unformatted artists, returns "Artist1;Artist2;Artist3"
+    pub fn unformatted_artists(&self) -> &str {
+        &self.artists
+    }
+    /// Unformatted album artists, returns "Artist1;Artist2;Artist3"
+    pub fn unformatted_album_artists(&self) -> &str {
+        self.album_artists
+            .as_deref()
+            .unwrap_or_default()
+    }
+
+    pub fn individual_artists(&self) -> Vec<&str> {
+        self.artists
+            .split(';')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect()
+    }
+
+    /// Returns a search haystack string, containing all searchable fields
+    // We do not keep it in search memory, it has derived fields and is cheap to build so no
+    // need to keep it in cache, although in future perhaps we could make it be in cache for
+    // faster loading? we'll see
+    pub fn write_search_haystack(&self, out: &mut String) {
+        use std::fmt::Write as _;
+        let _ = write!(
+            out,
+            "{} {} {} {} {}",
+            self.title,
+            self.formatted_artists(),
+            self.album.as_deref().unwrap_or(""),
+            self.genre.as_deref().unwrap_or(""),
+            self.date.as_deref().unwrap_or("")
+        );
+    }
+}
+
+#[derive(Clone)]
+pub struct Track {
+    pub path: PathBuf,
+
+    pub tags: TrackTags,
     pub length: Duration,
 }
 
@@ -101,70 +161,83 @@ impl Track {
 
         Self {
             path,
-            title,
-            artists,
-            album,
-            album_artists,
-            track_number,
-            disc_number,
-            genre,
-            date,
+            tags: TrackTags {
+                title,
+                artists,
+                album,
+                album_artists,
+                track_number,
+                disc_number,
+                genre,
+                date,
+            },
             length,
         }
     }
 
-    /// Returns artists in a nice format ("Artist1;Artist2" -> "Artist1, Artist2")
-    pub fn format_artists(raw: &str) -> String {
-        raw.split(';')
-            .map(|s| s.trim()) // remove any remaining whitespaces, so "Artist1; Artist2" and "Artist1;Artist2" behave the same
-            .collect::<Vec<_>>()
-            .join(", ")
-    }
+    pub fn save_tags(&mut self, tags: TrackTags) -> color_eyre::Result<()> {
+        let mut tagged_file =
+            lofty::read_from_path(&self.path).wrap_err("Failed to read audio file")?;
 
-    /// Formatted as "Artist 1, Artist 2, Artist 3"
-    pub fn formatted_artists(&self) -> String {
-        Self::format_artists(&self.artists)
-    }
+        let tag = match tagged_file.primary_tag_mut() {
+            Some(t) => t,
+            None => {
+                if let Some(first) = tagged_file.first_tag_mut() {
+                    first
+                } else {
+                    let tag_type = tagged_file.primary_tag_type();
+                    tagged_file.insert_tag(Tag::new(tag_type));
+                    tagged_file
+                        .primary_tag_mut()
+                        .unwrap()
+                }
+            },
+        };
 
-    // Why separation between formatted and unformatted and why not just make artists public? I
-    // don't wanna cause confusion, since artists are stored internally as separated with ;.
-    // Separate explicit function for formatted and unformatted artists make it more clear!
+        tag.set_title(tags.title.clone());
+        tag.set_artist(tags.artists.clone());
 
-    /// Unformatted artists, returns "Artist1;Artist2;Artist3"
-    pub fn unformatted_artists(&self) -> &str {
-        &self.artists
-    }
+        if let Some(ref al) = tags.album {
+            tag.set_album(al.clone());
+        } else {
+            tag.remove_album()
+        }
 
-    /// Unformatted album artists, returns "Artist1;Artist2;Artist3"
-    pub fn unformatted_album_artists(&self) -> &str {
-        self.album_artists
-            .as_deref()
-            .unwrap_or_default()
-    }
+        if let Some(ref g) = tags.genre {
+            tag.set_genre(g.clone());
+        } else {
+            tag.remove_genre();
+        }
 
-    pub fn individual_artists(&self) -> Vec<&str> {
-        self.artists
-            .split(';')
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .collect()
-    }
+        if let Some(t_num) = tags.track_number {
+            tag.set_track(t_num);
+        } else {
+            tag.remove_track();
+        }
 
-    /// Returns a search haystack string, containing all searchable fields
-    // We do not keep it in search memory, it has derived fields and is cheap to build so no
-    // need to keep it in cache, although in future perhaps we could make it be in cache for
-    // faster loading? we'll see
-    pub fn write_search_haystack(&self, out: &mut String) {
-        use std::fmt::Write as _;
-        let _ = write!(
-            out,
-            "{} {} {} {} {}",
-            self.title,
-            self.formatted_artists(),
-            self.album.as_deref().unwrap_or(""),
-            self.genre.as_deref().unwrap_or(""),
-            self.date.as_deref().unwrap_or("")
-        );
+        if let Some(d_num) = tags.disc_number {
+            tag.set_disk(d_num);
+        } else {
+            tag.remove_disk();
+        }
+
+        if let Some(ref aa) = tags.album_artists {
+            tag.insert_text(ItemKey::AlbumArtist, aa.clone());
+        } else {
+            tag.remove_key(ItemKey::AlbumArtist);
+        }
+
+        if let Some(ref date) = tags.date {
+            tag.insert_text(ItemKey::ReleaseDate, date.clone());
+        } else {
+            tag.remove_key(ItemKey::ReleaseDate);
+        }
+
+        tag.save_to_path(&self.path, WriteOptions::default())
+            .wrap_err("Failed to write tags to audio file")?;
+
+        self.tags = tags;
+        Ok(())
     }
 }
 
@@ -209,20 +282,32 @@ impl LibraryState {
                 writer,
                 "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
                 t.path.display(),
-                t.title,
-                t.artists,
-                t.album.as_deref().unwrap_or(""),
-                t.album_artists
+                t.tags.title,
+                t.tags.artists,
+                t.tags
+                    .album
                     .as_deref()
                     .unwrap_or(""),
-                t.track_number
+                t.tags
+                    .album_artists
+                    .as_deref()
+                    .unwrap_or(""),
+                t.tags
+                    .track_number
                     .map(|n| n.to_string())
                     .unwrap_or_default(),
-                t.disc_number
+                t.tags
+                    .disc_number
                     .map(|n| n.to_string())
                     .unwrap_or_default(),
-                t.genre.as_deref().unwrap_or(""),
-                t.date.as_deref().unwrap_or(""),
+                t.tags
+                    .genre
+                    .as_deref()
+                    .unwrap_or(""),
+                t.tags
+                    .date
+                    .as_deref()
+                    .unwrap_or(""),
                 t.length.as_millis()
             )?;
         }
@@ -249,14 +334,16 @@ impl LibraryState {
                 let millis: u64 = parts[9].parse().unwrap_or(0);
                 tracks.push(Track {
                     path: PathBuf::from(parts[0]),
-                    title: parts[1].to_string(),
-                    artists: parts[2].to_string(),
-                    album: opt_str(parts[3]),
-                    album_artists: opt_str(parts[4]),
-                    track_number: parts[5].parse::<u32>().ok(),
-                    disc_number: parts[6].parse::<u32>().ok(),
-                    genre: opt_str(parts[7]),
-                    date: opt_str(parts[8]),
+                    tags: TrackTags {
+                        title: parts[1].to_string(),
+                        artists: parts[2].to_string(),
+                        album: opt_str(parts[3]),
+                        album_artists: opt_str(parts[4]),
+                        track_number: parts[5].parse::<u32>().ok(),
+                        disc_number: parts[6].parse::<u32>().ok(),
+                        genre: opt_str(parts[7]),
+                        date: opt_str(parts[8]),
+                    },
                     length: Duration::from_millis(millis),
                 });
             }

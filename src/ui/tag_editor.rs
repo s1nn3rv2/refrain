@@ -1,4 +1,4 @@
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
@@ -23,6 +23,7 @@ pub struct TagEditor {
     pub track_number: TextInput,
     pub disc_number: TextInput,
     pub genre: TextInput,
+    pub date: TextInput,
     pub focused_field: usize,
 }
 
@@ -31,40 +32,53 @@ impl TagEditor {
 
     pub fn new(track_idx: usize, track: &Track) -> Self {
         let mut title = TextInput::new("").with_title("Title");
-        title.value = track.title.clone();
+        title.value = track.tags.title.clone();
         title.focus();
 
         let mut artists = TextInput::new("").with_title("Artists (separated with ;)");
         artists.value = track
+            .tags
             .unformatted_artists()
             .to_string();
 
         let mut album = TextInput::new("").with_title("Album");
         album.value = track
+            .tags
             .album
             .clone()
             .unwrap_or_default();
 
         let mut album_artists = TextInput::new("").with_title("Album artists");
         album_artists.value = track
+            .tags
             .unformatted_album_artists()
             .to_string();
 
         let mut track_number = TextInput::new("").with_title("Track Number");
         track_number.value = track
+            .tags
             .track_number
             .unwrap_or_default()
             .to_string();
 
         let mut disc_number = TextInput::new("").with_title("Disc Number");
         disc_number.value = track
+            .tags
             .disc_number
             .unwrap_or_default()
             .to_string();
 
         let mut genre = TextInput::new("").with_title("Genre");
         genre.value = track
+            .tags
             .genre
+            .clone()
+            .unwrap_or_default();
+
+        let mut date = TextInput::new("").with_title("Date");
+        date.value = track
+            .tags
+            .date
             .clone()
             .unwrap_or_default();
 
@@ -77,6 +91,7 @@ impl TagEditor {
             track_number,
             disc_number,
             genre,
+            date,
             focused_field: 0,
         }
     }
@@ -84,7 +99,14 @@ impl TagEditor {
     pub fn handle_key_event(&mut self, key: KeyEvent) -> Option<TagEditorAction> {
         match key.code {
             KeyCode::Esc => Some(TagEditorAction::Cancel),
-            KeyCode::Tab => {
+            KeyCode::Char('s')
+                if key
+                    .modifiers
+                    .contains(KeyModifiers::CONTROL) =>
+            {
+                Some(TagEditorAction::Save)
+            },
+            KeyCode::Tab | KeyCode::Enter => {
                 self.cycle_focus(true);
                 None
             },
@@ -108,7 +130,8 @@ impl TagEditor {
             3 => &mut self.album_artists,
             4 => &mut self.track_number,
             5 => &mut self.disc_number,
-            _ => &mut self.genre,
+            6 => &mut self.genre,
+            _ => &mut self.date,
         }
     }
 
@@ -125,19 +148,21 @@ impl TagEditor {
     }
 
     pub fn render(&mut self, frame: &mut Frame, area: Rect) {
-        let popup_area = area.centered(Constraint::Length(70), Constraint::Length(25));
+        let popup_area = area.centered(Constraint::Length(70), Constraint::Length(26));
 
         frame.render_widget(Clear, popup_area);
 
         let block = Block::bordered()
             .border_set(border::THICK)
             .border_style(Style::default().fg(Color::Cyan))
-            .title(" Edit Tags ");
+            .title(" Edit Tags ")
+            .title_bottom(" Ctrl + S to save, Esc to discard ");
 
         let inner = block.inner(popup_area);
         frame.render_widget(block, popup_area);
 
         let rows = Layout::vertical([
+            Constraint::Length(3),
             Constraint::Length(3),
             Constraint::Length(3),
             Constraint::Length(3),
@@ -158,5 +183,6 @@ impl TagEditor {
         self.disc_number
             .render(frame, rows[5]);
         self.genre.render(frame, rows[6]);
+        self.date.render(frame, rows[7]);
     }
 }

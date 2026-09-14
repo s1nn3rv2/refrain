@@ -32,7 +32,7 @@ impl TransportState {
         let current_track = player.current_track();
 
         let (title_display, time_display, progress) = if let Some(track) = current_track {
-            let song = format!("{} - {}", track.formatted_artists(), track.title);
+            let song = format!("{} - {}", track.tags.formatted_artists(), track.tags.title);
             let elapsed = player.elapsed();
             let time = format!("{} / {}", elapsed.format_time(), track.length.format_time());
             let progress = if track.length.as_secs_f64() > 0.0 {

@@ -29,14 +29,18 @@ pub fn track_to_row(track: &Track) -> Row<'_> {
     let duration_secs = track.length.as_secs();
     let duration_display = format!("{:02}:{:02}", duration_secs / 60, duration_secs % 60);
 
-    let centered_artist = Text::from(vec![Line::from(""), Line::from(track.formatted_artists())]);
+    let centered_artist = Text::from(vec![
+        Line::from(""),
+        Line::from(track.tags.formatted_artists()),
+    ]);
 
-    let centered_title = Text::from(vec![Line::from(""), Line::from(track.title.as_str())]);
+    let centered_title = Text::from(vec![Line::from(""), Line::from(track.tags.title.as_str())]);
 
     let centered_album = Text::from(vec![
         Line::from(""),
         Line::from(
             track
+                .tags
                 .album
                 .as_deref()
                 .unwrap_or(""),
@@ -62,17 +66,18 @@ pub fn track_to_row(track: &Track) -> Row<'_> {
 pub fn track_to_compact_row<'a>(track: &'a Track, width: usize) -> Row<'a> {
     let time = track.length.format_time();
     let album_name = track
+        .tags
         .album
         .as_deref()
         .unwrap_or("Single");
 
     let line_title = Line::from(Span::styled(
-        track.title.as_str(),
+        track.tags.title.as_str(),
         Style::default().add_modifier(Modifier::BOLD),
     ));
 
     let line_artist = Line::from(Span::styled(
-        track.formatted_artists(),
+        track.tags.formatted_artists(),
         Style::default().fg(Color::Gray),
     ));
 
