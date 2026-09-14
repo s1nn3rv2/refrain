@@ -1,4 +1,5 @@
 mod audio;
+mod config;
 mod cover;
 mod library;
 mod queue;
@@ -27,6 +28,7 @@ use ratatui_image::{picker::Picker, protocol::Protocol};
 
 use crate::{
     audio::AudioPlayer,
+    config::Config,
     library::{LibraryState, Track},
     queue::QueueManager,
     task::TaskManager,
@@ -525,6 +527,9 @@ impl App {
 
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
+
+    let config = Config::load()?;
+    Config::init(config);
 
     let picker = Picker::from_query_stdio()?;
 

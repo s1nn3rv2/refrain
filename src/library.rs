@@ -1,5 +1,4 @@
 use std::{
-    env::home_dir,
     fs::{self, File},
     io::{self, BufWriter, Write},
     path::{Path, PathBuf},
@@ -11,6 +10,8 @@ use lofty::{
     file::{AudioFile, TaggedFileExt},
     tag::{Accessor as _, ItemKey},
 };
+
+use crate::{config::Config, util};
 
 #[derive(Clone)]
 pub struct Track {
@@ -171,9 +172,7 @@ impl LibraryState {
     }
 
     fn cache_path() -> PathBuf {
-        home_dir()
-            .unwrap()
-            .join(".cache/refrain/library.tsv")
+        util::cache_dir().join("library.tsv")
     }
 
     pub fn cache_exists() -> bool {
@@ -252,7 +251,7 @@ impl LibraryState {
     // TODO: make scan incremental
     // TODO: automatically check file changes using notify and rescan
     pub fn scan(&mut self) -> color_eyre::Result<()> {
-        let music_path = home_dir().unwrap().join("Music");
+        let music_path = &Config::get().music_dir;
         let files = visit_dirs(&music_path).wrap_err("Failed to scan music directory")?;
 
         self.tracks = files

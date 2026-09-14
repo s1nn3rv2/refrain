@@ -24,10 +24,10 @@ impl DurationExt for std::time::Duration {
     }
 }
 
-/// taken from fnv crate code
-/// didn't add it as a dependency, as it is a pretty simple function
-/// Why use this instead of DefaultHasher? DefaultHasher is not stable,
-/// so cache could be invalidated during rust changes, using this prevents that.
+// taken from fnv crate code
+// didn't add it as a dependency, as it is a pretty simple function
+// Why use this instead of DefaultHasher? DefaultHasher is not stable,
+// so cache could be invalidated during rust changes, using this prevents that.
 pub fn fnv1a(bytes: &[u8]) -> u64 {
     let mut hash = 0xcbf2_9ce4_8422_2325;
     for &b in bytes {
@@ -47,6 +47,17 @@ pub fn get_mtime(file_path: &Path) -> u128 {
         .unwrap_or(0)
 }
 
+/// Returns `~/.cache/refrain`
+pub fn cache_dir() -> PathBuf {
+    dirs::cache_dir()
+        .unwrap_or_else(|| {
+            dirs::home_dir()
+                .map(|h| h.join(".cache"))
+                .unwrap_or_else(|| PathBuf::from(".cache"))
+        })
+        .join("refrain")
+}
+
 /// Utility to return cache path
 /// `~/.cache/refrain/<dir>/<hash>.<ext>`
 /// Keyed by path and modified time
@@ -62,9 +73,7 @@ pub fn cache_path(track_path: &Path, dir: &str, ext: &str) -> PathBuf {
     let key = format!("{}:{mtime}", track_path.display());
     let hash = fnv1a(key.as_bytes());
 
-    home_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(".cache/refrain")
+    cache_dir()
         .join(dir)
         .join(format!("{hash:016x}.{ext}"))
 }
