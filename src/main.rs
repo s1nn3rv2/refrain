@@ -33,9 +33,10 @@ use crate::{
     queue::QueueManager,
     task::TaskManager,
     ui::{
-        input::{InputAction, TextInput},
+        input::InputAction,
         library::{LibraryAction, LibraryWidget},
         queue::{QueueAction, QueueWidget},
+        search::SearchBar,
         sidebar::{SidebarAction, SidebarWidget},
         transport::{TransportAction, TransportState},
     },
@@ -70,7 +71,7 @@ pub struct App {
     queue_widget: QueueWidget,
     show_queue: bool,
 
-    search: TextInput,
+    search: SearchBar,
     tasks: TaskManager,
     waveform: Option<WaveformData>,
     cover: Option<Protocol>, // transport cover art
@@ -117,7 +118,7 @@ impl App {
             queue: QueueManager::new(),
             queue_widget: QueueWidget::new(),
             show_queue: true,
-            search: TextInput::new("Search", "Press '/' to search..."),
+            search: SearchBar::new(),
             tasks: TaskManager::new(picker, events_tx),
             cover: None,
             thumbnails: LruCache::new(NonZeroUsize::new(128).unwrap()),
@@ -242,6 +243,7 @@ impl App {
         );
 
         self.search
+            .input
             .render(frame, search_area);
 
         self.library_widget.render(
@@ -294,14 +296,15 @@ impl App {
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         // Search mode has exclusive keyobard input!
-        if self.search.is_focused {
+        if self.search.input.is_focused {
             match self
                 .search
+                .input
                 .handle_key_event(key_event)
             {
                 InputAction::Changed => {
                     self.library_widget
-                        .update_filter(&self.library, &self.search.value);
+                        .update_filter(&self.library, &self.search.input.value);
                     self.sidebar.update_from_filtered(
                         &self.library,
                         &self
@@ -310,7 +313,7 @@ impl App {
                     );
                 },
                 InputAction::Submitted | InputAction::Escaped => {
-                    self.search.unfocus();
+                    self.search.input.unfocus();
                 },
                 _ => {},
             }
@@ -323,7 +326,7 @@ impl App {
             KeyCode::Char('r') => {
                 let _ = self.library.scan();
                 self.library_widget
-                    .update_filter(&self.library, &self.search.value);
+                    .update_filter(&self.library, &self.search.input.value);
                 self.sidebar.update_from_filtered(
                     &self.library,
                     &self
@@ -336,7 +339,7 @@ impl App {
             },
             KeyCode::Char('u') => self.show_queue = !self.show_queue,
             KeyCode::Char('/') => {
-                self.search.focus();
+                self.search.input.focus();
                 return;
             },
             KeyCode::Tab => {
@@ -360,7 +363,7 @@ impl App {
                         self.search
                             .set_tag(key, value.as_deref());
                         self.library_widget
-                            .update_filter(&self.library, &self.search.value);
+                            .update_filter(&self.library, &self.search.input.value);
                         self.sidebar.update_from_filtered(
                             &self.library,
                             &self
@@ -517,7 +520,7 @@ impl App {
     // not have the highlighted borders, to bring more attention that youre focused on the search
     // input field
     fn is_pane_focused(&self, view: ActiveView) -> bool {
-        !self.search.is_focused && self.active_view == view
+        !self.search.input.is_focused && self.active_view == view
     }
 
     fn exit(&mut self) {

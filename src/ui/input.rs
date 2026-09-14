@@ -5,8 +5,6 @@ use ratatui::{
     widgets::{Block, Padding, Paragraph},
 };
 
-use crate::util;
-
 pub enum InputAction {
     None,
     Changed,   // modified
@@ -19,18 +17,23 @@ pub struct TextInput {
     pub character_index: usize,
     pub is_focused: bool,
     pub placeholder: String,
-    pub title: String,
+    pub title: Option<String>,
 }
 
 impl TextInput {
-    pub fn new(title: impl Into<String>, placeholder: impl Into<String>) -> Self {
+    pub fn new(placeholder: impl Into<String>) -> Self {
         Self {
             value: String::new(),
             character_index: 0,
             is_focused: false,
             placeholder: placeholder.into(),
-            title: title.into(),
+            title: None,
         }
+    }
+
+    pub fn with_title(mut self, title: impl Into<String>) -> Self {
+        self.title = Some(title.into());
+        self
     }
 
     pub fn focus(&mut self) {
@@ -159,29 +162,5 @@ impl TextInput {
             let cursor_y = inner.y;
             frame.set_cursor_position(Position::new(cursor_x, cursor_y));
         }
-    }
-
-    // Should be moved to search.rs later, but is fine for now as we don't have more than 1 input
-    // yet
-    pub fn set_tag(&mut self, key: &str, value: Option<&str>) {
-        let tag_prefix = format!("{key}:");
-
-        let mut terms: Vec<String> = util::tokenize(&self.value)
-            .into_iter()
-            .filter(|token| !token.starts_with(&tag_prefix))
-            .collect();
-
-        if let Some(val) = value {
-            // if has spaces (more than 1 word), surround it in quotes
-            let tag = if val.contains(' ') {
-                format!("{tag_prefix}\"{val}\"")
-            } else {
-                format!("{tag_prefix}{val}")
-            };
-            terms.insert(0, tag);
-        }
-
-        self.value = terms.join(" ");
-        self.character_index = self.value.chars().count();
     }
 }
