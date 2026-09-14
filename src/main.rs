@@ -381,6 +381,8 @@ impl App {
                 {
                     Some(QueueAction::Play(idx)) => self.queue_play(idx),
                     Some(QueueAction::Remove(idx)) => self.queue_remove(idx),
+                    Some(QueueAction::MoveTrackUp(idx)) => self.queue_move_track_up(idx),
+                    Some(QueueAction::MoveTrackDown(idx)) => self.queue_move_track_down(idx),
                     None => {},
                 }
             },
@@ -458,6 +460,28 @@ impl App {
             self.queue_widget
                 .state
                 .select(Some(len - 1));
+        }
+    }
+
+    fn queue_move_track_up(&mut self, idx: usize) {
+        if idx > 0 && idx < self.queue.user_queue.len() {
+            self.queue
+                .user_queue
+                .swap(idx, idx - 1);
+            self.queue_widget
+                .state
+                .select(Some(idx - 1));
+        }
+    }
+
+    fn queue_move_track_down(&mut self, idx: usize) {
+        if idx + 1 < self.queue.user_queue.len() {
+            self.queue
+                .user_queue
+                .swap(idx, idx + 1);
+            self.queue_widget
+                .state
+                .select(Some(idx + 1));
         }
     }
 

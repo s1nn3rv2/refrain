@@ -1,27 +1,27 @@
 use std::path::PathBuf;
 
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use lru::LruCache;
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Rect, Size},
     style::{Color, Modifier, Style},
     symbols::border,
-    text::{Line, Span, Text},
-    widgets::{Block, Cell, Padding, Row, StatefulWidget, Table, TableState},
+    widgets::{Block, Padding, Row, StatefulWidget, Table, TableState},
 };
 use ratatui_image::protocol::Protocol;
 
 use crate::{
     queue::QueueManager,
     task::THUMB_SIZE,
-    ui::track::{ROW_MARGIN, render_visible_thumbnails, track_to_compact_row},
-    util::DurationExt,
+    ui::track::{render_visible_thumbnails, track_to_compact_row},
 };
 
 pub enum QueueAction {
     Play(usize), // Play immediately
     Remove(usize),
+    MoveTrackUp(usize),
+    MoveTrackDown(usize),
 }
 
 pub struct QueueWidget {
@@ -122,6 +122,32 @@ impl QueueWidget {
 
     pub fn handle_key_event(&mut self, key_event: KeyEvent) -> Option<QueueAction> {
         match key_event.code {
+            KeyCode::Char('J') => self
+                .state
+                .selected()
+                .map(QueueAction::MoveTrackDown),
+            KeyCode::Down
+                if key_event
+                    .modifiers
+                    .contains(KeyModifiers::SHIFT) =>
+            {
+                self.state
+                    .selected()
+                    .map(QueueAction::MoveTrackDown)
+            },
+            KeyCode::Char('K') => self
+                .state
+                .selected()
+                .map(QueueAction::MoveTrackUp),
+            KeyCode::Up
+                if key_event
+                    .modifiers
+                    .contains(KeyModifiers::SHIFT) =>
+            {
+                self.state
+                    .selected()
+                    .map(QueueAction::MoveTrackUp)
+            },
             KeyCode::Char('j') | KeyCode::Down => {
                 self.next();
                 None
