@@ -28,7 +28,7 @@ pub struct TagEditor {
 }
 
 impl TagEditor {
-    const FIELD_COUNT: usize = 7;
+    const FIELD_COUNT: usize = 8;
 
     pub fn new(track_idx: usize, track: &Track) -> Self {
         let mut title = TextInput::new("").with_title("Title");
