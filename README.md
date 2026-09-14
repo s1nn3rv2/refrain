@@ -55,6 +55,15 @@ Built with Rust and Ratatui.
 | `K` / `Shift + Up` | Queue | Move selected track up |
 | `J` / `Shift + Down` | Queue | Move selected track down |
 
+## Configuration
+
+Refrain looks for a configuration file at `~/.config/refrain/config.toml`. If the file does not exist, default settings are used.
+
+```toml
+# Path to your music library (defaults to ~/Music)
+music_dir = "~/Music"
+```
+
 ---
 
 ## Why not rmpc?
