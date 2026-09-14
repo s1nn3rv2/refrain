@@ -28,6 +28,7 @@ pub enum LibraryAction {
     Play(usize), // track index in library.tracks
     AddToQueue(usize),
     PlayNext(usize),
+    EditTags(usize),
 }
 
 pub struct LibraryWidget {
@@ -174,6 +175,9 @@ impl LibraryWidget {
             KeyCode::Char('A') => self
                 .selected_track_index()
                 .map(LibraryAction::PlayNext),
+            KeyCode::Char('e') => self
+                .selected_track_index()
+                .map(LibraryAction::EditTags),
             _ => None,
         }
     }

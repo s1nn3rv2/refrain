@@ -3,6 +3,7 @@ pub mod library;
 pub mod queue;
 pub mod search;
 pub mod sidebar;
+pub mod tag_editor;
 pub mod track;
 pub mod transport;
 pub mod waveform;

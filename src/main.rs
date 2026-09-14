@@ -38,6 +38,7 @@ use crate::{
         queue::{QueueAction, QueueWidget},
         search::SearchBar,
         sidebar::{SidebarAction, SidebarWidget},
+        tag_editor::{TagEditor, TagEditorAction},
         transport::{TransportAction, TransportState},
     },
     waveform::WaveformData,
@@ -63,6 +64,8 @@ pub struct App {
 
     library: LibraryState,
     library_widget: LibraryWidget,
+
+    tag_editor: Option<TagEditor>,
 
     sidebar: SidebarWidget,
     player: AudioPlayer,
@@ -114,6 +117,7 @@ impl App {
             sidebar: SidebarWidget::new(&library),
             library,
             library_widget,
+            tag_editor: None,
             player: AudioPlayer::new().expect("Could not create audio player"),
             queue: QueueManager::new(),
             queue_widget: QueueWidget::new(),
@@ -273,6 +277,10 @@ impl App {
             transport_area,
             frame.buffer_mut(),
         );
+
+        if let Some(editor) = &mut self.tag_editor {
+            editor.render(frame, frame.area());
+        }
     }
 
     fn handle_event(&mut self, event: Event) {
@@ -295,6 +303,15 @@ impl App {
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
+        if let Some(editor) = &mut self.tag_editor {
+            match editor.handle_key_event(key_event) {
+                Some(TagEditorAction::Cancel) => self.tag_editor = None,
+                Some(TagEditorAction::Save) => todo!(),
+                None => {},
+            }
+            return;
+        }
+
         // Search mode has exclusive keyobard input!
         if self.search.input.is_focused {
             match self
@@ -382,6 +399,7 @@ impl App {
                     Some(LibraryAction::Play(idx)) => self.library_play(idx),
                     Some(LibraryAction::AddToQueue(idx)) => self.library_add_to_queue(idx),
                     Some(LibraryAction::PlayNext(idx)) => self.library_play_next(idx),
+                    Some(LibraryAction::EditTags(idx)) => self.library_edit_tags(idx),
                     None => {},
                 }
             },
@@ -448,6 +466,12 @@ impl App {
             } else {
                 self.queue.push_front(track);
             }
+        }
+    }
+
+    fn library_edit_tags(&mut self, idx: usize) {
+        if let Some(track) = self.library.tracks.get(idx) {
+            self.tag_editor = Some(TagEditor::new(idx, track));
         }
     }
 

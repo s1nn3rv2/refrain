@@ -141,9 +141,13 @@ impl TextInput {
             Color::DarkGray
         };
 
-        let block = Block::default()
-            .border_style(Style::default().fg(border_color))
-            .padding(Padding::horizontal(1));
+        let block = if let Some(title) = &self.title {
+            Block::bordered().title(format!(" {title} "))
+        } else {
+            Block::default()
+        }
+        .border_style(Style::default().fg(border_color))
+        .padding(Padding::horizontal(1));
         let inner = block.inner(area);
 
         frame.render_widget(block, area);

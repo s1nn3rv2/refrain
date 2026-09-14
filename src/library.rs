@@ -87,6 +87,7 @@ impl Track {
                 }
 
                 track_number = tag.track();
+                // i will not follow your "disk" spelling!!! disc is clearly superior
                 disc_number = tag.disk();
                 genre = tag.genre().map(|g| g.to_string());
 
@@ -123,6 +124,22 @@ impl Track {
     /// Formatted as "Artist 1, Artist 2, Artist 3"
     pub fn formatted_artists(&self) -> String {
         Self::format_artists(&self.artists)
+    }
+
+    // Why separation between formatted and unformatted and why not just make artists public? I
+    // don't wanna cause confusion, since artists are stored internally as separated with ;.
+    // Separate explicit function for formatted and unformatted artists make it more clear!
+
+    /// Unformatted artists, returns "Artist1;Artist2;Artist3"
+    pub fn unformatted_artists(&self) -> &str {
+        &self.artists
+    }
+
+    /// Unformatted album artists, returns "Artist1;Artist2;Artist3"
+    pub fn unformatted_album_artists(&self) -> &str {
+        self.album_artists
+            .as_deref()
+            .unwrap_or_default()
     }
 
     pub fn individual_artists(&self) -> Vec<&str> {
