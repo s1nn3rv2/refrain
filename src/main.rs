@@ -324,6 +324,12 @@ impl App {
                 let _ = self.library.scan();
                 self.library_widget
                     .update_filter(&self.library, &self.search.value);
+                self.sidebar.update_from_filtered(
+                    &self.library,
+                    &self
+                        .library_widget
+                        .filtered_indices,
+                );
             },
             KeyCode::Char('n') | KeyCode::Char('>') => {
                 self.play_next_track();
