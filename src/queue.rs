@@ -32,4 +32,15 @@ impl QueueManager {
         // no more tracks left!
         None
     }
+
+    /// Finds all occurences of track in queue and refreshes them with a new one
+    pub fn refresh_track(&mut self, track: &Track) {
+        for queued in self
+            .user_queue
+            .iter_mut()
+            .filter(|q| q.path == track.path)
+        {
+            queued.clone_from(track);
+        }
+    }
 }

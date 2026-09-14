@@ -75,4 +75,12 @@ impl AudioPlayer {
         self.player.stop();
         self.current_track = None;
     }
+
+    pub fn refresh_if_current(&mut self, track: &Track) {
+        if let Some(current) = &self.current_track
+            && current.path == track.path
+        {
+            self.current_track = Some(track.clone());
+        }
+    }
 }

@@ -539,20 +539,20 @@ impl App {
             .value
             .trim()
             .is_empty())
-        .then(|| editor.album.value);
+        .then_some(editor.album.value);
         let album_artists = (!editor
             .album_artists
             .value
             .trim()
             .is_empty())
-        .then(|| editor.album_artists.value);
+        .then_some(editor.album_artists.value);
         let genre = (!editor
             .genre
             .value
             .trim()
             .is_empty())
-        .then(|| editor.genre.value);
-        let date = (!editor.date.value.trim().is_empty()).then(|| editor.date.value);
+        .then_some(editor.genre.value);
+        let date = (!editor.date.value.trim().is_empty()).then_some(editor.date.value);
         let track_number = editor
             .track_number
             .value
@@ -576,6 +576,11 @@ impl App {
             genre,
             date,
         })?;
+
+        // update track in transport and queue too so tags are consistent
+        self.player
+            .refresh_if_current(track);
+        self.queue.refresh_track(track);
 
         let _ = self.library.save_cache();
 
