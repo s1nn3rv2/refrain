@@ -49,9 +49,11 @@ Built with Rust and Ratatui.
 | Key | Context | Action |
 |:---|:---|:---|
 | `a` | Library | Add selected track to queue |
-| `A` (`Shift + a`) | Library | Play selected track next (top of queue) |
+| `A` | Library | Play selected track next (top of queue) |
 | `Enter` / `l` | Queue | Play selected queued track |
 | `d` | Queue | Remove selected track from queue |
+| `K` / `Shift + Up` | Queue | Move selected track up |
+| `J` / `Shift + Down` | Queue | Move selected track down |
 
 ---
 
