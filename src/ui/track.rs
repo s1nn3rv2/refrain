@@ -69,7 +69,7 @@ pub fn track_to_compact_row<'a>(track: &'a Track, width: usize) -> Row<'a> {
         .tags
         .album
         .as_deref()
-        .unwrap_or("Single");
+        .unwrap_or("");
 
     let line_title = Line::from(Span::styled(
         track.tags.title.as_str(),
