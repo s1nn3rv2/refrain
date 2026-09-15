@@ -55,6 +55,16 @@ Built with Rust and Ratatui.
 | `K` / `Shift + Up` | Queue | Move selected track up |
 | `J` / `Shift + Down` | Queue | Move selected track down |
 
+### Sidebar
+
+| Key | Context | Action |
+|:---|:---|:---|
+| `[` / `Left` | Sidebar | Previous category tab (Genres, Albums, Artists) |
+| `]` / `Right` | Sidebar | Next category tab (Genres, Albums, Artists) |
+| `j` / `Down` | Sidebar | Move selection down |
+| `k` / `Up` | Sidebar | Move selection up |
+| `Enter` | Sidebar | Apply selected filter (or clear if "All" is selected) |
+
 ### Tag Editor
 
 | Key | Context | Action |

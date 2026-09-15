@@ -187,11 +187,11 @@ impl SidebarWidget {
 
     pub fn handle_key_event(&mut self, key_event: KeyEvent) -> Option<SidebarAction> {
         match key_event.code {
-            KeyCode::Char('[') => {
+            KeyCode::Char('[') | KeyCode::Left => {
                 self.prev();
                 None
             },
-            KeyCode::Char(']') => {
+            KeyCode::Char(']') | KeyCode::Right => {
                 self.next();
                 None
             },
