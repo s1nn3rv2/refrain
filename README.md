@@ -19,7 +19,7 @@ Built with Rust and Ratatui.
 - [x] Fuzzy search - fuzzy-search powered by [`nucleo-matcher`](https://github.com/helix-editor/nucleo) 
 - [x] Extremely fast - scanning 1800+ songs takes less than a second, covers load on demand
 - [x] Tag editing - allows you to edit tags on songs
-- [ ] MPRIS support - allows you to control and see the current song in your system's media player 
+- [x] MPRIS support - allows you to control and see the current song in your system's media player 
 - [x] Queue management - add tracks, play next, view and manage via collapsible drawer
 - [ ] Context-aware shuffle - knows your context, whether you're in an album, genre or everything, it knows what songs to pick from
 - [ ] Synced lyrics - automatically fetches and scrolls lyrics 
