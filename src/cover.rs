@@ -1,4 +1,7 @@
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use image::DynamicImage;
 use lofty::{file::TaggedFileExt, picture::PictureType};
@@ -68,4 +71,10 @@ fn extract(track_path: &Path) -> Option<DynamicImage> {
     // take first available
 
     image::load_from_memory(picture.data()).ok()
+}
+
+/// Path to cached cover file, creates it on cache miss. None if track has no cover art
+pub fn cached_file(track_path: &Path) -> Option<PathBuf> {
+    load_or_extract(track_path)?;
+    Some(util::cache_path(track_path, "covers", "jpg"))
 }

@@ -1,19 +1,20 @@
-use std::{fs::File, time::Duration};
+use std::{fs::File, sync::mpsc::Sender, time::Duration};
 
 use color_eyre::eyre::Context;
+use mpris_server::PlaybackStatus;
 use rodio::{Decoder, DeviceSinkBuilder, MixerDeviceSink, Player};
 
-use crate::library::Track;
+use crate::{AppEvent, library::Track, mpris::MprisManager};
 
-// TODO: add MPRIS support
 pub struct AudioPlayer {
     _device_sink: MixerDeviceSink,
     player: Player,
     current_track: Option<Track>,
+    mpris: MprisManager,
 }
 
 impl AudioPlayer {
-    pub fn new() -> color_eyre::Result<Self> {
+    pub fn new(events_tx: Sender<AppEvent>) -> color_eyre::Result<Self> {
         let device_sink =
             DeviceSinkBuilder::open_default_sink().wrap_err("Failed to open audio device")?;
 
@@ -23,6 +24,7 @@ impl AudioPlayer {
             _device_sink: device_sink,
             player,
             current_track: None,
+            mpris: MprisManager::new(events_tx),
         })
     }
 
@@ -39,6 +41,8 @@ impl AudioPlayer {
         self.player.play();
 
         self.current_track = Some(track.clone());
+        self.mpris.set_track(Some(track));
+        self.sync_mpris_status();
         Ok(())
     }
 
@@ -51,12 +55,15 @@ impl AudioPlayer {
         } else {
             self.player.play();
         }
+        self.sync_mpris_status();
     }
 
     pub fn seek(&self, position: Duration) -> color_eyre::Result<()> {
         self.player
             .try_seek(position)
-            .wrap_err("Failed to seek audio")
+            .wrap_err("Failed to seek audio")?;
+        self.mpris.seeked(position);
+        Ok(())
     }
 
     pub fn current_track(&self) -> Option<&Track> {
@@ -71,9 +78,16 @@ impl AudioPlayer {
         self.current_track.is_some() && self.player.empty()
     }
 
+    pub fn is_paused(&self) -> bool {
+        self.player.is_paused()
+    }
+
     pub fn stop(&mut self) {
         self.player.stop();
         self.current_track = None;
+        self.mpris.set_track(None);
+        self.mpris
+            .set_status(PlaybackStatus::Stopped);
     }
 
     pub fn refresh_if_current(&mut self, track: &Track) {
@@ -81,6 +95,28 @@ impl AudioPlayer {
             && current.path == track.path
         {
             self.current_track = Some(track.clone());
+            self.mpris.set_track(Some(track));
         }
+    }
+
+    fn sync_mpris_status(&self) {
+        let status = if self.current_track.is_none() {
+            PlaybackStatus::Stopped
+        } else if self.player.is_paused() {
+            PlaybackStatus::Paused
+        } else {
+            PlaybackStatus::Playing
+        };
+        self.mpris.set_status(status);
+    }
+
+    pub fn sync_mpris_position(&self) {
+        self.mpris
+            .set_position(self.elapsed());
+    }
+
+    pub fn sync_mpris_can_go_next(&self, can_go_next: bool) {
+        self.mpris
+            .set_can_go_next(can_go_next);
     }
 }

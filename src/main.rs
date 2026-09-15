@@ -2,6 +2,7 @@ mod audio;
 mod config;
 mod cover;
 mod library;
+mod mpris;
 mod queue;
 mod task;
 mod ui;
@@ -30,6 +31,7 @@ use crate::{
     audio::AudioPlayer,
     config::Config,
     library::{LibraryState, Track, TrackTags},
+    mpris::MprisAction,
     queue::QueueManager,
     task::TaskManager,
     ui::{
@@ -56,6 +58,7 @@ pub enum AppEvent {
     Waveform(usize, Box<WaveformData>), // box for clippy warning about large size difference
     Cover(usize, Option<Protocol>),     // cover art in transport
     Thumbnail(PathBuf, Size, Option<Protocol>), // cover arts in library
+    Mpris(MprisAction),
 }
 
 pub struct App {
@@ -118,12 +121,12 @@ impl App {
             library,
             library_widget,
             tag_editor: None,
-            player: AudioPlayer::new().expect("Could not create audio player"),
+            player: AudioPlayer::new(events_tx.clone()).expect("Could not create audio player"),
             queue: QueueManager::new(),
             queue_widget: QueueWidget::new(),
             show_queue: true,
             search: SearchBar::new(),
-            tasks: TaskManager::new(picker, events_tx),
+            tasks: TaskManager::new(picker, events_tx.clone()),
             cover: None,
             thumbnails: LruCache::new(NonZeroUsize::new(128).unwrap()),
             visible: Vec::new(),
@@ -160,6 +163,7 @@ impl App {
             }
 
             self.check_track_finished();
+            self.player.sync_mpris_position();
         }
 
         Ok(())
@@ -182,6 +186,51 @@ impl App {
             AppEvent::Thumbnail(path, size, protocol) => {
                 self.thumbnails
                     .put(path, protocol.map(|protocol| (size, protocol)));
+            },
+            AppEvent::Mpris(action) => match action {
+                MprisAction::PlayPause => self.player.resume_pause(),
+                MprisAction::Next => self.play_next_track(),
+                MprisAction::Play => {
+                    if self.player.is_paused() {
+                        self.player.resume_pause();
+                    }
+                },
+                MprisAction::Pause => {
+                    if !self.player.is_paused() {
+                        self.player.resume_pause();
+                    }
+                },
+                MprisAction::Stop => {
+                    self.player.stop();
+                    self.waveform = None;
+                    self.cover = None;
+                },
+                MprisAction::Seek(offset) => {
+                    if let Some(length) = self
+                        .player
+                        .current_track()
+                        .map(|t| t.length)
+                    {
+                        let target = self.player.elapsed().as_micros() as i64 + offset;
+                        if target >= length.as_micros() as i64 {
+                            self.play_next_track();
+                        } else {
+                            let _ = self
+                                .player
+                                .seek(Duration::from_micros(target.max(0) as u64));
+                        }
+                    }
+                },
+                MprisAction::SetPosition(position) => {
+                    if self
+                        .player
+                        .current_track()
+                        .is_some_and(|t| position <= t.length)
+                    {
+                        let _ = self.player.seek(position);
+                    }
+                },
+                MprisAction::Quit => self.exit(),
             },
         }
     }
@@ -448,6 +497,7 @@ impl App {
                 self.play_track(track);
             } else {
                 self.queue.push_back(track);
+                self.sync_mpris_queue_state();
             }
         }
     }
@@ -467,6 +517,7 @@ impl App {
                 self.play_track(track);
             } else {
                 self.queue.push_front(track);
+                self.sync_mpris_queue_state();
             }
         }
     }
@@ -481,11 +532,13 @@ impl App {
         // remove track from queue and play it
         if let Some(track) = self.queue.user_queue.remove(idx) {
             self.play_track(track);
+            self.sync_mpris_queue_state();
         }
     }
 
     fn queue_remove(&mut self, idx: usize) {
         self.queue.user_queue.remove(idx);
+        self.sync_mpris_queue_state();
 
         // clamp queue selection so cursor doesnt suddenly disappear
         let len = self.queue.user_queue.len();
@@ -614,6 +667,7 @@ impl App {
             self.waveform = None;
             self.cover = None;
         }
+        self.sync_mpris_queue_state();
     }
 
     // exists, because I want so when search input field is focused, I want the rest of the views to
@@ -631,6 +685,12 @@ impl App {
         if self.player.is_finished() {
             self.play_next_track();
         }
+    }
+
+    fn sync_mpris_queue_state(&self) {
+        let has_next = !self.queue.user_queue.is_empty();
+        self.player
+            .sync_mpris_can_go_next(has_next);
     }
 }
 
