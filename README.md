@@ -86,6 +86,7 @@ Rmpc is a really good option as well! But I missed having cover arts displayed o
 - **Waveforms:** [audio-waveform](https://github.com/s1nn3rv2/audio-waveform) 
 - **Image support:** [ratatui-image](https://github.com/benjajaja/ratatui-image)
 - **Fuzzy search:** [nucleo-matcher](https://github.com/helix-editor/nucleo)
+- **MPRIS D-Bus integration:** [mpris-server](https://github.com/SeaDve/mpris-server)
 
 ## Build & Run
 
