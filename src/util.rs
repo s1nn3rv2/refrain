@@ -5,6 +5,8 @@ use std::{
     time::UNIX_EPOCH,
 };
 
+use lofty::file::FileType;
+
 pub trait DurationExt {
     fn format_time(&self) -> String;
 }
@@ -108,4 +110,20 @@ pub fn tokenize(query: &str) -> Vec<String> {
     }
 
     tokens
+}
+
+// Lofty supports a ton of formats, but we are limited to what rodio will actually play. By default
+// it's those, can be expanded via feature flags if people will report need for more formats tho
+pub fn is_audio_file(path: &Path) -> bool {
+    matches!(
+        FileType::from_path(path),
+        Some(
+            FileType::Mpeg
+                | FileType::Flac
+                | FileType::Wav
+                | FileType::Vorbis
+                | FileType::Mp4
+                | FileType::Aac
+        )
+    )
 }

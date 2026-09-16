@@ -12,7 +12,10 @@ use lofty::{
     tag::{Accessor as _, ItemKey, Tag, TagExt},
 };
 
-use crate::{config::Config, util};
+use crate::{
+    config::Config,
+    util::{self, is_audio_file},
+};
 
 #[derive(Clone)]
 pub struct TrackTags {
@@ -368,7 +371,7 @@ impl LibraryState {
     // TODO: automatically check file changes using notify and rescan
     pub fn scan(&mut self) -> color_eyre::Result<()> {
         let music_path = &Config::get().music_dir;
-        let files = visit_dirs(&music_path).wrap_err("Failed to scan music directory")?;
+        let files = visit_dirs(music_path).wrap_err("Failed to scan music directory")?;
 
         self.tracks = files
             .into_iter()
@@ -395,7 +398,7 @@ fn collect_files(dir: &Path, files: &mut Vec<PathBuf>) -> io::Result<()> {
 
             if path.is_dir() {
                 collect_files(&path, files)?;
-            } else {
+            } else if is_audio_file(&path) {
                 files.push(path);
             }
         }
