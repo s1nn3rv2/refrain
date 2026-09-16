@@ -39,6 +39,8 @@ Built with Rust and Ratatui.
 | `p` | Play / Pause |
 | `n` / `>` | Next track |
 | `u` | Toggle queue drawer open / closed |
+| `s` | Cycle sort column |
+| `S` | Toggle sort direction (ascending/descending) |
 | `/` | Open fuzzy search |
 | `r` | Rescan `~/Music` directory |
 | `Esc` / `Enter` | Exit search mode |
