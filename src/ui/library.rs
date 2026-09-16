@@ -271,110 +271,118 @@ impl LibraryWidget {
     // TODO: add so you can match strictly (not fuzzy), by writing key=value instead of key:value
     // maybe?
     pub fn update_filter(&mut self, library: &LibraryState, query: &str) {
+        let prev_selected_track = self.selected_track_index();
+
         let query = query.trim();
 
         if query.is_empty() {
             // return all tracks
             self.filtered_indices = (0..library.tracks.len()).collect();
             self.sort(library);
-            // reset table cur selected
-            if self.filtered_indices.is_empty() {
-                self.state.select(None);
-            } else {
-                self.state.select(Some(0));
+        } else {
+            // separate tags (genre:xxx, artist:xxx, alum:xxx)
+            let tokens = util::tokenize(query);
+            let mut tags = Vec::new();
+            // all non-tag words
+            let mut generic_terms = Vec::new();
+
+            for token in &tokens {
+                match token.split_once(':') {
+                    Some((key, val)) if !val.is_empty() && Self::TAG_KEYS.contains(&key) => {
+                        // strip surrounding quotes, for example: `"EDM"` -> `'EDM'`
+                        let clean_val = val.trim_matches('"');
+                        if !clean_val.is_empty() {
+                            tags.push((
+                                key,
+                                Pattern::parse(
+                                    clean_val,
+                                    CaseMatching::Smart,
+                                    Normalization::Smart,
+                                ),
+                            ))
+                        }
+                    },
+                    _ => generic_terms.push(token.as_str()),
+                }
             }
+
+            // this is everything except the tags
+            let generic_query = generic_terms.join(" ");
+            let generic_pat = if generic_query.is_empty() {
+                None
+            } else {
+                Some(Pattern::parse(
+                    &generic_query,
+                    CaseMatching::Smart,
+                    Normalization::Smart,
+                ))
+            };
+
+            let mut haystack_buf = String::with_capacity(128);
+            let mut str_buf = Vec::new();
+
+            let mut scored_matches: Vec<(u32, usize)> = library
+                .tracks
+                .iter()
+                .enumerate()
+                .filter_map(|(idx, track)| {
+                    // check if tags on this track match our tags from the search query
+                    let all_tags_match = tags.iter().all(|(key, pat)| {
+                        let field: &str = match *key {
+                            "title" => &track.tags.title,
+                            "genre" => track.tags.genre(),
+                            "artist" => &track.tags.formatted_artists(),
+                            "album" => track.tags.album(),
+                            "date" => track.tags.date(),
+                            // unreachable
+                            _ => return false,
+                        };
+                        pat.score(Utf32Str::new(field, &mut str_buf), &mut self.matcher)
+                            .is_some()
+                    });
+
+                    if !all_tags_match {
+                        return None;
+                    }
+
+                    if let Some(ref pat) = generic_pat {
+                        haystack_buf.clear();
+                        track
+                            .tags
+                            .write_search_haystack(&mut haystack_buf);
+
+                        let score = pat.score(
+                            Utf32Str::new(&haystack_buf, &mut str_buf),
+                            &mut self.matcher,
+                        )?;
+                        Some((score, idx))
+                    } else {
+                        Some((1, idx))
+                    }
+                })
+                .collect();
+
+            // sort descending
+            scored_matches.sort_by_key(|&(score, _)| Reverse(score));
+
+            self.filtered_indices = scored_matches
+                .into_iter()
+                .map(|(_, idx)| idx)
+                .collect();
+        }
+
+        // Restore selection to same track if its still in the list
+        if let Some(prev_track) = prev_selected_track
+            && let Some(new_row) = self
+                .filtered_indices
+                .iter()
+                .position(|&idx| idx == prev_track)
+        {
+            self.state.select(Some(new_row));
             return;
         }
 
-        // separate tags (genre:xxx, artist:xxx, alum:xxx)
-        let tokens = util::tokenize(query);
-        let mut tags = Vec::new();
-        // all non-tag words
-        let mut generic_terms = Vec::new();
-
-        for token in &tokens {
-            match token.split_once(':') {
-                Some((key, val)) if !val.is_empty() && Self::TAG_KEYS.contains(&key) => {
-                    // strip surrounding quotes, for example: `"EDM"` -> `'EDM'`
-                    let clean_val = val.trim_matches('"');
-                    if !clean_val.is_empty() {
-                        tags.push((
-                            key,
-                            Pattern::parse(clean_val, CaseMatching::Smart, Normalization::Smart),
-                        ))
-                    }
-                },
-                _ => generic_terms.push(token.as_str()),
-            }
-        }
-
-        // this is everything except the tags
-        let generic_query = generic_terms.join(" ");
-        let generic_pat = if generic_query.is_empty() {
-            None
-        } else {
-            Some(Pattern::parse(
-                &generic_query,
-                CaseMatching::Smart,
-                Normalization::Smart,
-            ))
-        };
-
-        let mut haystack_buf = String::with_capacity(128);
-        let mut str_buf = Vec::new();
-
-        let mut scored_matches: Vec<(u32, usize)> = library
-            .tracks
-            .iter()
-            .enumerate()
-            .filter_map(|(idx, track)| {
-                // check if tags on this track match our tags from the search query
-                let all_tags_match = tags.iter().all(|(key, pat)| {
-                    let field: &str = match *key {
-                        "title" => &track.tags.title,
-                        "genre" => track.tags.genre(),
-                        "artist" => &track.tags.formatted_artists(),
-                        "album" => track.tags.album(),
-                        "date" => track.tags.date(),
-                        // unreachable
-                        _ => return false,
-                    };
-                    pat.score(Utf32Str::new(field, &mut str_buf), &mut self.matcher)
-                        .is_some()
-                });
-
-                if !all_tags_match {
-                    return None;
-                }
-
-                if let Some(ref pat) = generic_pat {
-                    haystack_buf.clear();
-                    track
-                        .tags
-                        .write_search_haystack(&mut haystack_buf);
-
-                    let score = pat.score(
-                        Utf32Str::new(&haystack_buf, &mut str_buf),
-                        &mut self.matcher,
-                    )?;
-                    Some((score, idx))
-                } else {
-                    Some((1, idx))
-                }
-            })
-            .collect();
-
-        // sort descending
-        scored_matches.sort_by_key(|&(score, _)| Reverse(score));
-
-        self.filtered_indices = scored_matches
-            .into_iter()
-            .map(|(_, idx)| idx)
-            .collect();
-
-        // Change table selection to first match
-        // TODO: make so it doesn't always change when the track you already have selected appears
-        // in the search results
+        // fall back, if track was removed or anything else
         if self.filtered_indices.is_empty() {
             self.state.select(None);
         } else {
@@ -432,6 +440,12 @@ impl LibraryWidget {
 
         if self.sort_direction == SortDirection::Descending {
             self.filtered_indices.reverse();
+        }
+
+        if self.filtered_indices.is_empty() {
+            self.state.select(None);
+        } else {
+            self.state.select(Some(0));
         }
     }
 }
