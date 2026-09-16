@@ -445,7 +445,7 @@ impl App {
             ActiveView::Library => {
                 match self
                     .library_widget
-                    .handle_key_event(key_event)
+                    .handle_key_event(key_event, &self.library)
                 {
                     Some(LibraryAction::Play(idx)) => self.library_play(idx),
                     Some(LibraryAction::AddToQueue(idx)) => self.library_add_to_queue(idx),

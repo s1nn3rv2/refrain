@@ -11,17 +11,63 @@ use ratatui::{
 use ratatui_image::{Image, protocol::Protocol};
 use unicode_truncate::UnicodeTruncateStr;
 
-use crate::{library::Track, task::THUMB_SIZE, ui::marquee::Marquee, util::DurationExt};
+use crate::{
+    library::Track,
+    task::THUMB_SIZE,
+    ui::{
+        library::{SortDirection, SortKey},
+        marquee::Marquee,
+    },
+    util::DurationExt,
+};
 
 pub const ROW_MARGIN: u16 = 1;
 
-pub fn track_table_header() -> Row<'static> {
+pub fn track_table_header(sort_key: SortKey, sort_direction: SortDirection) -> Row<'static> {
+    let arrow = match sort_direction {
+        SortDirection::Ascending => "▲",
+        SortDirection::Descending => "▼",
+    };
+
+    let artist_header = format!(
+        "Artists{}",
+        if sort_key == SortKey::Artist {
+            arrow
+        } else {
+            ""
+        }
+    );
+    let title_header = format!(
+        "Title{}",
+        if sort_key == SortKey::Title {
+            arrow
+        } else {
+            ""
+        }
+    );
+    let album_header = format!(
+        "Album{}",
+        if sort_key == SortKey::Album {
+            arrow
+        } else {
+            ""
+        }
+    );
+    let length_header = format!(
+        "Length{}",
+        if sort_key == SortKey::Length {
+            arrow
+        } else {
+            ""
+        }
+    );
+
     Row::new([
         Cell::from(""),
-        Cell::from("Artists"),
-        Cell::from("Title"),
-        Cell::from("Album"),
-        Cell::from(Line::from("Length").right_aligned()), // cell has no right_aligned lol
+        Cell::from(artist_header),
+        Cell::from(title_header),
+        Cell::from(album_header),
+        Cell::from(Line::from(length_header).right_aligned()), // cell has no right_aligned lol
     ])
 }
 

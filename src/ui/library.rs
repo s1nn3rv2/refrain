@@ -22,6 +22,20 @@ use crate::{
     util,
 };
 
+#[derive(Copy, Clone, PartialEq)]
+pub enum SortKey {
+    Title,
+    Artist,
+    Album,
+    Length,
+}
+
+#[derive(Copy, Clone, PartialEq)]
+pub enum SortDirection {
+    Ascending,
+    Descending,
+}
+
 // TODO: change usize to Track to avoid any indexing errors? will see though if its necessary
 pub enum LibraryAction {
     Play(usize), // track index in library.tracks
@@ -33,6 +47,8 @@ pub enum LibraryAction {
 pub struct LibraryWidget {
     pub state: TableState,
     pub filtered_indices: Vec<usize>, // list of filtered indices (pointing to library.tracks)
+    pub sort_key: SortKey,
+    pub sort_direction: SortDirection,
     matcher: Matcher,
 }
 
@@ -43,6 +59,8 @@ impl Default for LibraryWidget {
         Self {
             state,
             filtered_indices: Vec::default(),
+            sort_key: SortKey::Title,
+            sort_direction: SortDirection::Ascending,
             matcher: Matcher::default(),
         }
     }
@@ -107,7 +125,8 @@ impl LibraryWidget {
 
         let inner = block.inner(area);
 
-        let header = track_table_header().style(Style::new().bold());
+        let header =
+            track_table_header(self.sort_key, self.sort_direction).style(Style::new().bold());
 
         let widths = [
             Constraint::Length(THUMB_SIZE.width),
@@ -183,7 +202,11 @@ impl LibraryWidget {
         );
     }
 
-    pub fn handle_key_event(&mut self, key_event: KeyEvent) -> Option<LibraryAction> {
+    pub fn handle_key_event(
+        &mut self,
+        key_event: KeyEvent,
+        library: &LibraryState,
+    ) -> Option<LibraryAction> {
         match key_event.code {
             KeyCode::Char('j') | KeyCode::Down => {
                 self.next();
@@ -205,6 +228,24 @@ impl LibraryWidget {
             KeyCode::Char('e') => self
                 .selected_track_index()
                 .map(LibraryAction::EditTags),
+            KeyCode::Char('s') => {
+                self.sort_key = match self.sort_key {
+                    SortKey::Artist => SortKey::Title,
+                    SortKey::Title => SortKey::Album,
+                    SortKey::Album => SortKey::Length,
+                    SortKey::Length => SortKey::Artist,
+                };
+                self.sort(library);
+                None
+            },
+            KeyCode::Char('S') => {
+                self.sort_direction = match self.sort_direction {
+                    SortDirection::Ascending => SortDirection::Descending,
+                    SortDirection::Descending => SortDirection::Ascending,
+                };
+                self.sort(library);
+                None
+            },
             _ => None,
         }
     }
@@ -218,6 +259,7 @@ impl LibraryWidget {
         if query.is_empty() {
             // return all tracks
             self.filtered_indices = (0..library.tracks.len()).collect();
+            self.sort(library);
             // reset table cur selected
             if self.filtered_indices.is_empty() {
                 self.state.select(None);
@@ -332,6 +374,44 @@ impl LibraryWidget {
             self.state.select(None);
         } else {
             self.state.select(Some(0));
+        }
+    }
+
+    pub fn sort(&mut self, library: &LibraryState) {
+        match self.sort_key {
+            SortKey::Title => self
+                .filtered_indices
+                .sort_by_cached_key(|&i| {
+                    library.tracks[i]
+                        .tags
+                        .title
+                        .to_lowercase()
+                }),
+            SortKey::Artist => self
+                .filtered_indices
+                .sort_by_cached_key(|&i| {
+                    library.tracks[i]
+                        .tags
+                        .artists
+                        .to_lowercase()
+                }),
+            SortKey::Album => self
+                .filtered_indices
+                .sort_by_cached_key(|&i| {
+                    library.tracks[i]
+                        .tags
+                        .album
+                        .as_deref()
+                        .unwrap_or("")
+                        .to_lowercase()
+                }),
+            SortKey::Length => self
+                .filtered_indices
+                .sort_by_key(|&i| library.tracks[i].length),
+        }
+
+        if self.sort_direction == SortDirection::Descending {
+            self.filtered_indices.reverse();
         }
     }
 }
