@@ -1,5 +1,6 @@
 pub mod input;
 pub mod library;
+pub mod marquee;
 pub mod queue;
 pub mod search;
 pub mod sidebar;

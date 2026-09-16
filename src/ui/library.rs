@@ -8,7 +8,7 @@ use nucleo_matcher::{
 };
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Rect, Size},
+    layout::{Constraint, Layout, Rect, Size},
     style::{Color, Modifier, Style},
     symbols::border,
     widgets::{Block, Padding, Row, StatefulWidget, Table, TableState},
@@ -99,15 +99,15 @@ impl LibraryWidget {
             Style::default().fg(Color::DarkGray)
         };
 
+        let block = Block::bordered()
+            .title(" Library ")
+            .border_set(border::THICK)
+            .padding(Padding::horizontal(1))
+            .border_style(border_style);
+
+        let inner = block.inner(area);
+
         let header = track_table_header().style(Style::new().bold());
-        // track number & disc number should only display in context of album, not on themselves
-        // (could add an option to config for that perhaps if someone wants that)
-        let rows: Vec<Row> = self
-            .filtered_indices
-            .iter()
-            .filter_map(|&idx| library.tracks.get(idx))
-            .map(|track| track_to_row(track))
-            .collect();
 
         let widths = [
             Constraint::Length(THUMB_SIZE.width),
@@ -117,13 +117,41 @@ impl LibraryWidget {
             Constraint::Percentage(8),
         ];
 
-        let block = Block::bordered()
-            .title(" Library ")
-            .border_set(border::THICK)
-            .padding(Padding::horizontal(1))
-            .border_style(border_style);
+        let [_, artist_col, title_col, album_col, _] = Layout::horizontal(widths)
+            .spacing(1)
+            .areas(inner);
 
-        let inner = block.inner(area);
+        let offset = self.state.offset();
+        // how many tracks can fit on screen, + 2 at end: +1 for table header row and +1 for safety
+        let visible_count = (inner.height / (THUMB_SIZE.height + ROW_MARGIN)) as usize + 2;
+        let visible_range = offset..offset + visible_count;
+
+        // track number & disc number should only display in context of album, not on themselves
+        // (could add an option to config for that perhaps if someone wants that)
+        let rows: Vec<Row> = self
+            .filtered_indices
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &idx)| {
+                library
+                    .tracks
+                    .get(idx)
+                    .map(|t| (i, t))
+            })
+            .map(|(i, track)| {
+                if visible_range.contains(&i) {
+                    track_to_row(
+                        track,
+                        artist_col.width as usize,
+                        title_col.width as usize,
+                        album_col.width as usize,
+                    )
+                } else {
+                    // off-screen, we dont use marquee then
+                    track_to_row(track, usize::MAX, usize::MAX, usize::MAX)
+                }
+            })
+            .collect();
 
         let table = Table::new(rows, widths)
             .header(header)

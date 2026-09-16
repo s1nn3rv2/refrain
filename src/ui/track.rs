@@ -11,7 +11,7 @@ use ratatui::{
 use ratatui_image::{Image, protocol::Protocol};
 use unicode_truncate::UnicodeTruncateStr;
 
-use crate::{library::Track, task::THUMB_SIZE, util::DurationExt};
+use crate::{library::Track, task::THUMB_SIZE, ui::marquee::Marquee, util::DurationExt};
 
 pub const ROW_MARGIN: u16 = 1;
 
@@ -25,28 +25,27 @@ pub fn track_table_header() -> Row<'static> {
     ])
 }
 
-pub fn track_to_row(track: &Track) -> Row<'_> {
+pub fn track_to_row(
+    track: &Track,
+    artist_width: usize,
+    title_width: usize,
+    album_width: usize,
+) -> Row<'_> {
     let duration_secs = track.length.as_secs();
     let duration_display = format!("{:02}:{:02}", duration_secs / 60, duration_secs % 60);
 
-    let centered_artist = Text::from(vec![
-        Line::from(""),
-        Line::from(track.tags.formatted_artists()),
-    ]);
+    let artist = Marquee::scroll(&track.tags.formatted_artists(), artist_width);
+    let title = Marquee::scroll(&track.tags.title, title_width);
+    let album = track
+        .tags
+        .album
+        .as_deref()
+        .map(|a| Marquee::scroll(a, album_width))
+        .unwrap_or_default();
 
-    let centered_title = Text::from(vec![Line::from(""), Line::from(track.tags.title.as_str())]);
-
-    let centered_album = Text::from(vec![
-        Line::from(""),
-        Line::from(
-            track
-                .tags
-                .album
-                .as_deref()
-                .unwrap_or(""),
-        ),
-    ]);
-
+    let centered_artist = Text::from(vec![Line::from(""), Line::from(artist)]);
+    let centered_title = Text::from(vec![Line::from(""), Line::from(title)]);
+    let centered_album = Text::from(vec![Line::from(""), Line::from(album)]);
     let centered_duration = Text::from(vec![
         Line::from(""),
         Line::from(duration_display).right_aligned(),
@@ -72,17 +71,19 @@ pub fn track_to_compact_row<'a>(track: &'a Track, width: usize) -> Row<'a> {
         .unwrap_or("");
 
     let line_title = Line::from(Span::styled(
-        track.tags.title.as_str(),
+        Marquee::scroll(track.tags.title.as_str(), width),
         Style::default().add_modifier(Modifier::BOLD),
     ));
 
     let line_artist = Line::from(Span::styled(
-        track.tags.formatted_artists(),
+        Marquee::scroll(&track.tags.formatted_artists(), width),
         Style::default().fg(Color::Gray),
     ));
 
     let max_album = width.saturating_sub(time.len() + 1);
-    let (album_display, album_width) = album_name.unicode_truncate(max_album);
+
+    let album_display = Marquee::scroll(album_name, max_album);
+    let album_width = Line::from(album_display.as_str()).width();
 
     let pad = width.saturating_sub(album_width + time.len());
     let line_album = Line::from(vec![
