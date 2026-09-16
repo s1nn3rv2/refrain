@@ -1,5 +1,4 @@
 use std::{
-    env::home_dir,
     fs,
     path::{Path, PathBuf},
     time::UNIX_EPOCH,

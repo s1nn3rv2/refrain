@@ -199,12 +199,17 @@ impl LibraryWidget {
                 .filter_map(|&idx| library.tracks.get(idx))
                 .map(|t| t.path.as_path());
 
+            let rows_area = Rect {
+                y: inner.y + 1,
+                height: inner.height.saturating_sub(1),
+                ..inner
+            };
+
             render_visible_thumbnails(
                 paths,
                 self.state.offset(),
-                true,
                 cover_x,
-                inner,
+                rows_area,
                 thumbnails,
                 visible,
                 buf,

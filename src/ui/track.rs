@@ -111,24 +111,21 @@ pub fn track_to_compact_row<'a>(track: &'a Track, width: usize) -> Row<'a> {
 pub fn render_visible_thumbnails<'a, I>(
     tracks: I,
     offset: usize,
-    has_header: bool,
     cover_x: u16,
-    inner: Rect,
+    area: Rect,
     thumbnails: &mut LruCache<std::path::PathBuf, Option<(Size, Protocol)>>,
     visible: &mut Vec<(std::path::PathBuf, Size)>,
     buf: &mut Buffer,
 ) where
     I: IntoIterator<Item = &'a Path>,
 {
-    let first_row_y = if has_header { inner.y + 1 } else { inner.y };
-
     for (screen_row, path) in tracks
         .into_iter()
         .skip(offset)
         .enumerate()
     {
-        let y = first_row_y + screen_row as u16 * (THUMB_SIZE.height + ROW_MARGIN);
-        if y + THUMB_SIZE.height > inner.y + inner.height {
+        let y = area.y + screen_row as u16 * (THUMB_SIZE.height + ROW_MARGIN);
+        if y + THUMB_SIZE.height > area.y + area.height {
             break;
         }
 
