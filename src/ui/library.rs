@@ -16,19 +16,12 @@ use ratatui::{
 use ratatui_image::protocol::Protocol;
 
 use crate::{
+    config::{Column, ColumnSetting, Config},
     library::LibraryState,
     task::THUMB_SIZE,
     ui::track::{ROW_MARGIN, render_visible_thumbnails, track_table_header, track_to_row},
     util,
 };
-
-#[derive(Copy, Clone, PartialEq)]
-pub enum SortKey {
-    Title,
-    Artist,
-    Album,
-    Length,
-}
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum SortDirection {
@@ -47,19 +40,35 @@ pub enum LibraryAction {
 pub struct LibraryWidget {
     pub state: TableState,
     pub filtered_indices: Vec<usize>, // list of filtered indices (pointing to library.tracks)
-    pub sort_key: SortKey,
+    pub columns: Vec<ColumnSetting>,
+    pub widths: Vec<Constraint>,
+    pub sort_key: Column,
     pub sort_direction: SortDirection,
     matcher: Matcher,
 }
 
 impl Default for LibraryWidget {
     fn default() -> Self {
+        let config = Config::get();
+        let columns = config.columns.clone();
+        let widths: Vec<Constraint> = columns
+            .iter()
+            .map(|c| c.constraint())
+            .collect();
+        let sort_key = columns
+            .iter()
+            .map(|c| c.column())
+            .find(|c| *c != Column::Cover)
+            .unwrap_or(Column::Title);
+
         let mut state = TableState::default();
         state.select(Some(0));
         Self {
             state,
             filtered_indices: Vec::default(),
-            sort_key: SortKey::Title,
+            columns,
+            widths,
+            sort_key,
             sort_direction: SortDirection::Ascending,
             matcher: Matcher::default(),
         }
@@ -125,25 +134,23 @@ impl LibraryWidget {
 
         let inner = block.inner(area);
 
-        let header =
-            track_table_header(self.sort_key, self.sort_direction).style(Style::new().bold());
-
-        let widths = [
-            Constraint::Length(THUMB_SIZE.width),
-            Constraint::Percentage(20),
-            Constraint::Fill(1),
-            Constraint::Percentage(20),
-            Constraint::Percentage(8),
-        ];
-
-        let [_, artist_col, title_col, album_col, _] = Layout::horizontal(widths)
+        let col_areas = Layout::horizontal(&self.widths)
             .spacing(1)
-            .areas(inner);
+            .split(inner);
+        let col_widths: Vec<usize> = col_areas
+            .iter()
+            .map(|a| a.width as usize)
+            .collect();
+
+        let header = track_table_header(&self.columns, self.sort_key, self.sort_direction)
+            .style(Style::new().bold());
 
         let offset = self.state.offset();
         // how many tracks can fit on screen, + 2 at end: +1 for table header row and +1 for safety
         let visible_count = (inner.height / (THUMB_SIZE.height + ROW_MARGIN)) as usize + 2;
         let visible_range = offset..offset + visible_count;
+
+        let fake_widths = vec![usize::MAX; self.columns.len()];
 
         // track number & disc number should only display in context of album, not on themselves
         // (could add an option to config for that perhaps if someone wants that)
@@ -159,20 +166,15 @@ impl LibraryWidget {
             })
             .map(|(i, track)| {
                 if visible_range.contains(&i) {
-                    track_to_row(
-                        track,
-                        artist_col.width as usize,
-                        title_col.width as usize,
-                        album_col.width as usize,
-                    )
+                    track_to_row(track, &self.columns, &col_widths)
                 } else {
                     // off-screen, we dont use marquee then
-                    track_to_row(track, usize::MAX, usize::MAX, usize::MAX)
+                    track_to_row(track, &self.columns, &fake_widths)
                 }
             })
             .collect();
 
-        let table = Table::new(rows, widths)
+        let table = Table::new(rows, &self.widths)
             .header(header)
             .block(block)
             .column_spacing(1)
@@ -185,21 +187,29 @@ impl LibraryWidget {
 
         StatefulWidget::render(table, area, buf, &mut self.state);
 
-        let paths = self
-            .filtered_indices
+        if let Some(cover_idx) = self
+            .columns
             .iter()
-            .filter_map(|&idx| library.tracks.get(idx))
-            .map(|t| t.path.as_path());
+            .position(|c| c.column() == Column::Cover)
+        {
+            let cover_x = col_areas[cover_idx].x;
+            let paths = self
+                .filtered_indices
+                .iter()
+                .filter_map(|&idx| library.tracks.get(idx))
+                .map(|t| t.path.as_path());
 
-        render_visible_thumbnails(
-            paths,
-            self.state.offset(),
-            true,
-            inner,
-            thumbnails,
-            visible,
-            buf,
-        );
+            render_visible_thumbnails(
+                paths,
+                self.state.offset(),
+                true,
+                cover_x,
+                inner,
+                thumbnails,
+                visible,
+                buf,
+            );
+        }
     }
 
     pub fn handle_key_event(
@@ -229,13 +239,20 @@ impl LibraryWidget {
                 .selected_track_index()
                 .map(LibraryAction::EditTags),
             KeyCode::Char('s') => {
-                self.sort_key = match self.sort_key {
-                    SortKey::Artist => SortKey::Title,
-                    SortKey::Title => SortKey::Album,
-                    SortKey::Album => SortKey::Length,
-                    SortKey::Length => SortKey::Artist,
-                };
-                self.sort(library);
+                let sortable: Vec<Column> = self
+                    .columns
+                    .iter()
+                    .map(|c| c.column())
+                    .filter(|c| *c != Column::Cover)
+                    .collect();
+
+                if let Some(pos) = sortable
+                    .iter()
+                    .position(|c| *c == self.sort_key)
+                {
+                    self.sort_key = sortable[(pos + 1) % sortable.len()];
+                    self.sort(library);
+                }
                 None
             },
             KeyCode::Char('S') => {
@@ -367,7 +384,7 @@ impl LibraryWidget {
 
     pub fn sort(&mut self, library: &LibraryState) {
         match self.sort_key {
-            SortKey::Title => self
+            Column::Title => self
                 .filtered_indices
                 .sort_by_cached_key(|&i| {
                     library.tracks[i]
@@ -375,7 +392,7 @@ impl LibraryWidget {
                         .title
                         .to_lowercase()
                 }),
-            SortKey::Artist => self
+            Column::Artist => self
                 .filtered_indices
                 .sort_by_cached_key(|&i| {
                     library.tracks[i]
@@ -383,7 +400,7 @@ impl LibraryWidget {
                         .artists
                         .to_lowercase()
                 }),
-            SortKey::Album => self
+            Column::Album => self
                 .filtered_indices
                 .sort_by_cached_key(|&i| {
                     library.tracks[i]
@@ -391,9 +408,26 @@ impl LibraryWidget {
                         .album()
                         .to_lowercase()
                 }),
-            SortKey::Length => self
+            Column::Genre => self
+                .filtered_indices
+                .sort_by_cached_key(|&i| {
+                    library.tracks[i]
+                        .tags
+                        .genre()
+                        .to_lowercase()
+                }),
+            Column::Date => self
+                .filtered_indices
+                .sort_by_cached_key(|&i| {
+                    library.tracks[i]
+                        .tags
+                        .date()
+                        .to_lowercase()
+                }),
+            Column::Length => self
                 .filtered_indices
                 .sort_by_key(|&i| library.tracks[i].length),
+            Column::Cover => {},
         }
 
         if self.sort_direction == SortDirection::Descending {

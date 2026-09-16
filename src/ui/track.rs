@@ -11,95 +11,68 @@ use ratatui::{
 use ratatui_image::{Image, protocol::Protocol};
 
 use crate::{
+    config::{Column, ColumnSetting},
     library::Track,
     task::THUMB_SIZE,
-    ui::{
-        library::{SortDirection, SortKey},
-        marquee::Marquee,
-    },
+    ui::{library::SortDirection, marquee::Marquee},
     util::DurationExt,
 };
 
 pub const ROW_MARGIN: u16 = 1;
 
-pub fn track_table_header(sort_key: SortKey, sort_direction: SortDirection) -> Row<'static> {
+pub fn track_table_header(
+    columns: &[ColumnSetting],
+    sort_key: Column,
+    sort_direction: SortDirection,
+) -> Row<'static> {
     let arrow = match sort_direction {
         SortDirection::Ascending => "▲",
         SortDirection::Descending => "▼",
     };
 
-    let artist_header = format!(
-        "Artists{}",
-        if sort_key == SortKey::Artist {
-            arrow
+    let cells = columns.iter().map(|col_setting| {
+        let col = col_setting.column();
+        let label = col_setting.label();
+        let text = if col == sort_key {
+            format!("{}{}", label, arrow)
         } else {
-            ""
-        }
-    );
-    let title_header = format!(
-        "Title{}",
-        if sort_key == SortKey::Title {
-            arrow
-        } else {
-            ""
-        }
-    );
-    let album_header = format!(
-        "Album{}",
-        if sort_key == SortKey::Album {
-            arrow
-        } else {
-            ""
-        }
-    );
-    let length_header = format!(
-        "Length{}",
-        if sort_key == SortKey::Length {
-            arrow
-        } else {
-            ""
-        }
-    );
+            label
+        };
 
-    Row::new([
-        Cell::from(""),
-        Cell::from(artist_header),
-        Cell::from(title_header),
-        Cell::from(album_header),
-        Cell::from(Line::from(length_header).right_aligned()), // cell has no right_aligned lol
-    ])
+        let line = Line::from(text).alignment(col_setting.alignment());
+        Cell::from(line)
+    });
+
+    Row::new(cells)
 }
 
 pub fn track_to_row(
     track: &Track,
-    artist_width: usize,
-    title_width: usize,
-    album_width: usize,
-) -> Row<'_> {
-    let duration_secs = track.length.as_secs();
-    let duration_display = format!("{:02}:{:02}", duration_secs / 60, duration_secs % 60);
+    columns: &[ColumnSetting],
+    col_widths: &[usize],
+) -> Row<'static> {
+    let cells = columns
+        .iter()
+        .zip(col_widths)
+        .map(|(col_setting, &width)| {
+            let align = col_setting.alignment();
+            let text = match col_setting.column() {
+                Column::Cover => String::new(),
+                Column::Artist => Marquee::scroll(&track.tags.formatted_artists(), width),
+                Column::Title => Marquee::scroll(track.tags.title.as_str(), width),
+                Column::Album => Marquee::scroll(track.tags.album(), width),
+                Column::Genre => Marquee::scroll(track.tags.genre(), width),
+                Column::Date => Marquee::scroll(track.tags.date(), width),
+                Column::Length => track.length.format_time(),
+            };
 
-    let artist = Marquee::scroll(&track.tags.formatted_artists(), artist_width);
-    let title = Marquee::scroll(&track.tags.title, title_width);
-    let album = Marquee::scroll(track.tags.album(), album_width);
+            let line = Line::from(text).alignment(align);
+            Cell::from(Text::from(vec![Line::from(""), line]))
+        });
 
-    let centered_artist = Text::from(vec![Line::from(""), Line::from(artist)]);
-    let centered_title = Text::from(vec![Line::from(""), Line::from(title)]);
-    let centered_album = Text::from(vec![Line::from(""), Line::from(album)]);
-    let centered_duration = Text::from(vec![
-        Line::from(""),
-        Line::from(duration_display).right_aligned(),
-    ]);
-
-    Row::new([
-        Cell::from(""), // for cover art
-        Cell::from(centered_artist),
-        Cell::from(centered_title),
-        Cell::from(centered_album),
-        Cell::from(centered_duration),
-    ])
-    .height(THUMB_SIZE.height)
-    .bottom_margin(ROW_MARGIN)
+    Row::new(cells)
+        .height(THUMB_SIZE.height)
+        .bottom_margin(ROW_MARGIN)
 }
 
 pub fn track_to_compact_row<'a>(track: &'a Track, width: usize) -> Row<'a> {
@@ -139,6 +112,7 @@ pub fn render_visible_thumbnails<'a, I>(
     tracks: I,
     offset: usize,
     has_header: bool,
+    cover_x: u16,
     inner: Rect,
     thumbnails: &mut LruCache<std::path::PathBuf, Option<(Size, Protocol)>>,
     visible: &mut Vec<(std::path::PathBuf, Size)>,
@@ -147,7 +121,6 @@ pub fn render_visible_thumbnails<'a, I>(
     I: IntoIterator<Item = &'a Path>,
 {
     let first_row_y = if has_header { inner.y + 1 } else { inner.y };
-    let first_row_x = inner.x;
 
     for (screen_row, path) in tracks
         .into_iter()
@@ -160,7 +133,7 @@ pub fn render_visible_thumbnails<'a, I>(
         }
 
         let rect = Rect {
-            x: first_row_x,
+            x: cover_x,
             y,
             width: THUMB_SIZE.width,
             height: THUMB_SIZE.height,

@@ -84,7 +84,38 @@ Refrain looks for a configuration file at `~/.config/refrain/config.toml`. If th
 ```toml
 # Path to your music library (defaults to ~/Music)
 music_dir = "~/Music"
+
+# Simple column setup (uses default widths and alignments)
+columns = [
+    "cover",
+    "artist",
+    "title",
+    "album",
+    "length"
+]
+
+# Fully custom columns:
+# columns = [
+#    "cover"
+#    { name = "artist", label = "Artist", width = "25%" },
+#    { name = "title", width = "fill"},
+#    { name = "album", label = "Album", width = "20%" },
+#    { name = "genre", labbel = "Genre", width = "15%" },
+#    { name = "date", label = "Year", width = "4", alignment = "center" },
+#    { name = "length", label = "Time", width = "8", alignment = "right"}
+#]
 ```
+
+Available columns:
+| Name | Description | Default Width | Default Alignment |
+|:---|:---|:---|:---|
+|cover|Cover art thumbnail|7 chars|Left|
+|title|Track title|fill|Left|
+|artist|Track artists|20|Left|
+|album|Album name|20%|Left|
+|genre|Genre|15%|Left|
+|date|Release date/year|10 chars|Left|
+|length|Track duration|8 chars|Right|
 
 ---
 

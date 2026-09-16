@@ -113,6 +113,7 @@ impl QueueWidget {
             paths,
             self.state.offset(),
             false,
+            inner.x,
             inner,
             thumbnails,
             visible,
