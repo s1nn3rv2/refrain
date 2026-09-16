@@ -9,7 +9,6 @@ use ratatui::{
     widgets::{Cell, Row, Widget},
 };
 use ratatui_image::{Image, protocol::Protocol};
-use unicode_truncate::UnicodeTruncateStr;
 
 use crate::{
     library::Track,
@@ -82,12 +81,7 @@ pub fn track_to_row(
 
     let artist = Marquee::scroll(&track.tags.formatted_artists(), artist_width);
     let title = Marquee::scroll(&track.tags.title, title_width);
-    let album = track
-        .tags
-        .album
-        .as_deref()
-        .map(|a| Marquee::scroll(a, album_width))
-        .unwrap_or_default();
+    let album = Marquee::scroll(track.tags.album(), album_width);
 
     let centered_artist = Text::from(vec![Line::from(""), Line::from(artist)]);
     let centered_title = Text::from(vec![Line::from(""), Line::from(title)]);
@@ -110,11 +104,7 @@ pub fn track_to_row(
 
 pub fn track_to_compact_row<'a>(track: &'a Track, width: usize) -> Row<'a> {
     let time = track.length.format_time();
-    let album_name = track
-        .tags
-        .album
-        .as_deref()
-        .unwrap_or("");
+    let album_name = track.tags.album();
 
     let line_title = Line::from(Span::styled(
         Marquee::scroll(track.tags.title.as_str(), width),

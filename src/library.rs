@@ -63,6 +63,18 @@ impl TrackTags {
             .collect()
     }
 
+    pub fn album(&self) -> &str {
+        self.album.as_deref().unwrap_or("")
+    }
+
+    pub fn genre(&self) -> &str {
+        self.genre.as_deref().unwrap_or("")
+    }
+
+    pub fn date(&self) -> &str {
+        self.date.as_deref().unwrap_or("")
+    }
+
     /// Returns a search haystack string, containing all searchable fields
     // We do not keep it in search memory, it has derived fields and is cheap to build so no
     // need to keep it in cache, although in future perhaps we could make it be in cache for
@@ -74,9 +86,9 @@ impl TrackTags {
             "{} {} {} {} {}",
             self.title,
             self.formatted_artists(),
-            self.album.as_deref().unwrap_or(""),
-            self.genre.as_deref().unwrap_or(""),
-            self.date.as_deref().unwrap_or("")
+            self.album(),
+            self.genre(),
+            self.date()
         );
     }
 }

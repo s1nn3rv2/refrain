@@ -315,22 +315,10 @@ impl LibraryWidget {
                 let all_tags_match = tags.iter().all(|(key, pat)| {
                     let field: &str = match *key {
                         "title" => &track.tags.title,
-                        "genre" => track
-                            .tags
-                            .genre
-                            .as_deref()
-                            .unwrap_or(""),
+                        "genre" => track.tags.genre(),
                         "artist" => &track.tags.formatted_artists(),
-                        "album" => track
-                            .tags
-                            .album
-                            .as_deref()
-                            .unwrap_or(""),
-                        "date" => track
-                            .tags
-                            .date
-                            .as_deref()
-                            .unwrap_or(""),
+                        "album" => track.tags.album(),
+                        "date" => track.tags.date(),
                         // unreachable
                         _ => return false,
                     };
@@ -400,9 +388,7 @@ impl LibraryWidget {
                 .sort_by_cached_key(|&i| {
                     library.tracks[i]
                         .tags
-                        .album
-                        .as_deref()
-                        .unwrap_or("")
+                        .album()
                         .to_lowercase()
                 }),
             SortKey::Length => self
