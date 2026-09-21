@@ -1,8 +1,5 @@
 use std::{
-    fs::{self, File},
-    io::{self, BufWriter, Write},
-    path::{Path, PathBuf},
-    time::Duration,
+    collections::HashMap, fs::{self, File}, io::{self, BufWriter, Write}, path::{Path, PathBuf}, time::Duration,
 };
 
 use color_eyre::eyre::Context;
@@ -102,10 +99,14 @@ pub struct Track {
 
     pub tags: TrackTags,
     pub length: Duration,
+
+    /// Used by incremental scan to know if the file changed since last scan
+    pub mtime: u128,
 }
 
 impl Track {
     pub fn from_path(path: PathBuf) -> Self {
+        let mtime = util::get_mtime(&path);
         let mut title = path
             .file_name()
             .unwrap()
@@ -187,6 +188,7 @@ impl Track {
                 date,
             },
             length,
+            mtime,
         }
     }
 
@@ -252,7 +254,22 @@ impl Track {
             .wrap_err("Failed to write tags to audio file")?;
 
         self.tags = tags;
+        self.mtime = util::get_mtime(&self.path); // file was rewritten! make sure to update mtime
         Ok(())
+    }
+}
+
+/// Shows what changed during a scan
+#[derive(Default)]
+pub struct Scan {
+    pub added: Vec<PathBuf>,
+    pub updated: Vec<PathBuf>,
+    pub removed: Vec<PathBuf>,
+}
+
+impl Scan {
+    pub fn is_empty(&self) -> bool {
+        self.added.is_empty() && self.updated.is_empty() && self.removed.is_empty()
     }
 }
 
@@ -293,9 +310,10 @@ impl LibraryState {
         let mut writer = BufWriter::new(file);
 
         for t in &self.tracks {
+            // TODO: make this done in a nicer way, this is so awful it actually hurts
             writeln!(
                 writer,
-                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
                 t.path.display(),
                 t.tags.title,
                 t.tags.artists,
@@ -323,7 +341,8 @@ impl LibraryState {
                     .date
                     .as_deref()
                     .unwrap_or(""),
-                t.length.as_millis()
+                t.length.as_millis(),
+                t.mtime,
             )?;
         }
 
@@ -345,7 +364,7 @@ impl LibraryState {
 
         for line in content.lines() {
             let parts: Vec<&str> = line.split('\t').collect();
-            if parts.len() == 10 {
+            if parts.len() == 11 {
                 let millis: u64 = parts[9].parse().unwrap_or(0);
                 tracks.push(Track {
                     path: PathBuf::from(parts[0]),
@@ -360,6 +379,7 @@ impl LibraryState {
                         date: opt_str(parts[8]),
                     },
                     length: Duration::from_millis(millis),
+                    mtime: parts[10].parse().unwrap_or(0),
                 });
             }
         }
@@ -367,30 +387,52 @@ impl LibraryState {
         Ok(tracks)
     }
 
-    // TODO: make scan incremental
     // TODO: automatically check file changes using notify and rescan
-    pub fn scan(&mut self) -> color_eyre::Result<()> {
+    /// Scans tracks in music directory incrementally
+    pub fn scan(&mut self) -> color_eyre::Result<Scan> {
         let music_path = &Config::get().music_dir;
         let files = visit_dirs(music_path).wrap_err("Failed to scan music directory")?;
 
-        self.tracks = files
-            .into_iter()
-            .map(|path| -> Track { Track::from_path(path) })
-            .collect();
+        // hashmap for quicker lookup
+        // old is stuff that existed on last scan
+        let mut old: HashMap<PathBuf, Track> = std::mem::take(&mut self.tracks).into_iter().map(|t| (t.path.clone(), t)).collect();
 
-        self.save_cache()?;
+        let mut scan = Scan::default();
+        let mut tracks = Vec::with_capacity(files.len());
 
-        Ok(())
+        for (path, mtime) in files {
+            match old.remove(&path) {
+                Some(track) if track.mtime == mtime => tracks.push(track),
+                Some(_) => {
+                    scan.updated.push(path.clone());
+                    tracks.push(Track::from_path(path));
+                },
+                None => {
+                    scan.added.push(path.clone());
+                    tracks.push(Track::from_path(path));
+                },
+            }
+        }
+
+        scan.removed = old.into_keys().collect();
+
+        self.tracks = tracks;
+
+        if !scan.is_empty() {
+            self.save_cache()?;
+        }
+
+        Ok(scan)
     }
 }
 
-fn visit_dirs(dir: &Path) -> io::Result<Vec<PathBuf>> {
+fn visit_dirs(dir: &Path) -> io::Result<Vec<(PathBuf, u128)>> {
     let mut files = Vec::new();
     collect_files(dir, &mut files)?;
     Ok(files)
 }
 
-fn collect_files(dir: &Path, files: &mut Vec<PathBuf>) -> io::Result<()> {
+fn collect_files(dir: &Path, files: &mut Vec<(PathBuf, u128)>) -> io::Result<()> {
     if dir.is_dir() {
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
@@ -399,7 +441,8 @@ fn collect_files(dir: &Path, files: &mut Vec<PathBuf>) -> io::Result<()> {
             if path.is_dir() {
                 collect_files(&path, files)?;
             } else if is_audio_file(&path) {
-                files.push(path);
+                let mtime = util::get_mtime(&path);
+                files.push((path, mtime));
             }
         }
     }
