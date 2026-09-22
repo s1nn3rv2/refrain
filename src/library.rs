@@ -280,16 +280,12 @@ pub struct LibraryState {
 
 impl LibraryState {
     pub fn new() -> Self {
-        if let Ok(tracks) = Self::load_cache()
-            && !tracks.is_empty()
-        {
-            return Self { tracks };
-        }
-
-        // if cant load cache (on first startup most likely), scan library first and then save cache
-        let mut state = Self::default();
+        // load first from cache
+        let mut state = Self {
+            tracks: Self::load_cache().unwrap_or_default(),
+        };
+        // and run incremental scan to check for changes since last run
         let _ = state.scan();
-        let _ = state.save_cache();
         state
     }
 

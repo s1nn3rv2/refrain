@@ -378,12 +378,8 @@ impl LibraryWidget {
 
         // Restore selection to same track if its still in the list
         if let Some(prev_track) = prev_selected_track
-            && let Some(new_row) = self
-                .filtered_indices
-                .iter()
-                .position(|&idx| idx == prev_track)
+            && self.select_track(prev_track)
         {
-            self.state.select(Some(new_row));
             return;
         }
 
@@ -392,6 +388,17 @@ impl LibraryWidget {
             self.state.select(None);
         } else {
             self.state.select(Some(0));
+        }
+    }
+
+    /// Selects `track_idx` row. Returns false if it's filtered out
+    pub fn select_track(&mut self, track_idx: usize) -> bool {
+        match self.filtered_indices.iter().position(|&idx| idx == track_idx) {
+            Some(row) => {
+                self.state.select(Some(row));
+                true
+            },
+            None => false,
         }
     }
 
