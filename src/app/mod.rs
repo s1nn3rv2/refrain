@@ -216,6 +216,10 @@ impl App {
         self.library_widget.render(
             self.is_pane_focused(ActiveView::Library),
             &self.library,
+            self.player
+                .current_track()
+                .map(|t| t.path.as_path()),
+            self.player.is_paused(),
             &mut self.thumbnails,
             &mut self.visible,
             library_area,

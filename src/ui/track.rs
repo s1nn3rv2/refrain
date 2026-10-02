@@ -50,6 +50,7 @@ pub fn track_to_row(
     track: &Track,
     columns: &[ColumnSetting],
     col_widths: &[usize],
+    prefix: &str,
 ) -> Row<'static> {
     let cells = columns
         .iter()
@@ -59,7 +60,16 @@ pub fn track_to_row(
             let text = match col_setting.column() {
                 Column::Cover => String::new(),
                 Column::Artist => Marquee::scroll(&track.tags.formatted_artists(), width),
-                Column::Title => Marquee::scroll(track.tags.title.as_str(), width),
+                Column::Title => {
+                    let prefix_width = Line::from(prefix).width();
+                    let title =
+                        Marquee::scroll(&track.tags.title, width.saturating_sub(prefix_width));
+                    if prefix.is_empty() {
+                        title
+                    } else {
+                        format!("{prefix}{title}")
+                    }
+                },
                 Column::Album => Marquee::scroll(track.tags.album(), width),
                 Column::Genre => Marquee::scroll(track.tags.genre(), width),
                 Column::Date => Marquee::scroll(track.tags.date(), width),

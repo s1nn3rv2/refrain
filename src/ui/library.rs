@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
-use std::{cmp::Reverse, path::PathBuf};
+use std::{
+    cmp::Reverse,
+    path::{Path, PathBuf},
+};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use lru::LruCache;
@@ -116,6 +119,8 @@ impl LibraryWidget {
         &mut self,
         is_focused: bool,
         library: &LibraryState,
+        playing: Option<&Path>,
+        paused: bool,
         thumbnails: &mut LruCache<PathBuf, Option<(Size, Protocol)>>,
         visible: &mut Vec<(PathBuf, Size)>,
         area: Rect,
@@ -153,6 +158,8 @@ impl LibraryWidget {
 
         let fake_widths = vec![usize::MAX; self.columns.len()];
 
+        let indicator = if paused { "⏸ " } else { "▶ " };
+
         // track number & disc number should only display in context of album, not on themselves
         // (could add an option to config for that perhaps if someone wants that)
         let rows: Vec<Row> = self
@@ -166,11 +173,16 @@ impl LibraryWidget {
                     .map(|t| (i, t))
             })
             .map(|(i, track)| {
+                let prefix = if playing == Some(track.path.as_path()) {
+                    indicator
+                } else {
+                    ""
+                };
                 if visible_range.contains(&i) {
-                    track_to_row(track, &self.columns, &col_widths)
+                    track_to_row(track, &self.columns, &col_widths, prefix)
                 } else {
                     // off-screen, we dont use marquee then
-                    track_to_row(track, &self.columns, &fake_widths)
+                    track_to_row(track, &self.columns, &fake_widths, "")
                 }
             })
             .collect();
