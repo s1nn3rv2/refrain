@@ -23,7 +23,7 @@ use crate::{
     util,
 };
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SortDirection {
     Ascending,
     Descending,

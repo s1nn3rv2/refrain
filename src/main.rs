@@ -7,6 +7,7 @@ mod queue;
 mod task;
 mod ui;
 mod util;
+mod state;
 mod waveform;
 
 use std::{
@@ -46,7 +47,7 @@ use crate::{
     waveform::WaveformData,
 };
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub enum ActiveView {
     Library,
     Sidebar,
