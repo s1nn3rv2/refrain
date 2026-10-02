@@ -1,11 +1,12 @@
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 
-use crate::{ActiveView, config::Column, ui::library::SortDirection};
+use crate::{app::ActiveView, config::Column, ui::library::SortDirection};
 
 // if app ever gets big, should probably use separate states for different elements of the app
 // instead of one like this
 #[derive(Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct State {
     pub current_track: Option<PathBuf>,
     pub position_ms: u64, // could use duration, but this is just simpler lol, Duration gives a

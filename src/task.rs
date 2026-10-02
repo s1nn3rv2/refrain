@@ -13,7 +13,8 @@ use ratatui::layout::Size;
 use ratatui_image::{Resize, picker::Picker, protocol::Protocol};
 
 use crate::{
-    AppEvent, cover,
+    app::AppEvent,
+    cover,
     waveform::{self},
 };
 

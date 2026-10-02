@@ -4,7 +4,7 @@ use color_eyre::eyre::Context;
 use mpris_server::PlaybackStatus;
 use rodio::{Decoder, DeviceSinkBuilder, MixerDeviceSink, Player};
 
-use crate::{AppEvent, library::Track, mpris::MprisManager};
+use crate::{app::AppEvent, library::Track, mpris::MprisManager};
 
 pub struct AudioPlayer {
     _device_sink: MixerDeviceSink,

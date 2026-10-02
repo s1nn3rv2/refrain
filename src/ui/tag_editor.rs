@@ -7,7 +7,10 @@ use ratatui::{
     widgets::{Block, Clear},
 };
 
-use crate::{library::Track, ui::input::TextInput};
+use crate::{
+    library::{Track, TrackTags},
+    ui::input::TextInput,
+};
 
 pub enum TagEditorAction {
     Save,
@@ -184,5 +187,28 @@ impl TagEditor {
             .render(frame, rows[5]);
         self.genre.render(frame, rows[6]);
         self.date.render(frame, rows[7]);
+    }
+
+    pub fn to_tags(self) -> TrackTags {
+        TrackTags {
+            title: self.title.value,
+            artists: self.artists.value,
+            album: Some(self.album.value).filter(|s| !s.trim().is_empty()),
+            album_artists: Some(self.album_artists.value).filter(|s| !s.trim().is_empty()),
+            track_number: self
+                .track_number
+                .value
+                .trim()
+                .parse()
+                .ok(),
+            disc_number: self
+                .disc_number
+                .value
+                .trim()
+                .parse()
+                .ok(),
+            genre: Some(self.genre.value).filter(|s| !s.trim().is_empty()),
+            date: Some(self.date.value).filter(|s| !s.trim().is_empty()),
+        }
     }
 }

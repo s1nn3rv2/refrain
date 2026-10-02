@@ -1,5 +1,9 @@
 use std::{
-    collections::HashMap, fs::{self, File}, io::{self, BufWriter, Write}, path::{Path, PathBuf}, time::Duration,
+    collections::HashMap,
+    fs::{self, File},
+    io::{self, BufWriter, Write},
+    path::{Path, PathBuf},
+    time::Duration,
 };
 
 use color_eyre::eyre::Context;
@@ -391,7 +395,10 @@ impl LibraryState {
 
         // hashmap for quicker lookup
         // old is stuff that existed on last scan
-        let mut old: HashMap<PathBuf, Track> = std::mem::take(&mut self.tracks).into_iter().map(|t| (t.path.clone(), t)).collect();
+        let mut old: HashMap<PathBuf, Track> = std::mem::take(&mut self.tracks)
+            .into_iter()
+            .map(|t| (t.path.clone(), t))
+            .collect();
 
         let mut scan = Scan::default();
         let mut tracks = Vec::with_capacity(files.len());

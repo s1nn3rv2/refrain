@@ -2,7 +2,7 @@ use std::{sync::mpsc::Sender, thread, time::Duration};
 
 use mpris_server::{Metadata, PlaybackStatus, Player, Time, TrackId};
 
-use crate::{AppEvent, cover, library::Track, util};
+use crate::{app::AppEvent, cover, library::Track, util};
 
 pub enum MprisAction {
     Play,
