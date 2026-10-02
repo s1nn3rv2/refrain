@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::{cmp::Reverse, path::PathBuf};
 
 use crossterm::event::{KeyCode, KeyEvent};
@@ -393,7 +394,11 @@ impl LibraryWidget {
 
     /// Selects `track_idx` row. Returns false if it's filtered out
     pub fn select_track(&mut self, track_idx: usize) -> bool {
-        match self.filtered_indices.iter().position(|&idx| idx == track_idx) {
+        match self
+            .filtered_indices
+            .iter()
+            .position(|&idx| idx == track_idx)
+        {
             Some(row) => {
                 self.state.select(Some(row));
                 true

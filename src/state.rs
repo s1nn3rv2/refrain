@@ -1,9 +1,11 @@
+use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 
 use crate::{ActiveView, config::Column, ui::library::SortDirection};
 
 // if app ever gets big, should probably use separate states for different elements of the app
 // instead of one like this
+#[derive(Default, Serialize, Deserialize)]
 pub struct State {
     pub current_track: Option<PathBuf>,
     pub position_ms: u64, // could use duration, but this is just simpler lol, Duration gives a
@@ -19,10 +21,29 @@ pub struct State {
 
 impl State {
     fn path() -> Option<PathBuf> {
-        dirs::state_dir().or_else(dirs::data_local_dir).map(|dir| dir.join("refrain").join("state.toml"))
+        dirs::state_dir()
+            .or_else(dirs::data_local_dir)
+            .map(|dir| {
+                dir.join("refrain")
+                    .join("state.toml")
+            })
     }
 
-    fn load() -> Self {
-        Self::path().and_then(|path| fs::read_to_string(path).ok()).and_then(|content| toml::from_str(&content).ok()).unwrap_or_default()
+    pub fn load() -> Self {
+        Self::path()
+            .and_then(|path| fs::read_to_string(path).ok())
+            .and_then(|content| toml::from_str(&content).ok())
+            .unwrap_or_default()
+    }
+
+    pub fn save(&self) -> color_eyre::Result<()> {
+        let Some(path) = Self::path() else {
+            return Ok(());
+        };
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(path, toml::to_string(self)?)?;
+        Ok(())
     }
 }

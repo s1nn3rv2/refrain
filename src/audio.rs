@@ -28,7 +28,7 @@ impl AudioPlayer {
         })
     }
 
-    pub fn play(&mut self, track: &Track) -> color_eyre::Result<()> {
+    pub fn load(&mut self, track: &Track) -> color_eyre::Result<()> {
         let file = File::open(&track.path)
             .wrap_err_with(|| format!("Failed to open file: {:?}", track.path))?;
 
@@ -36,12 +36,18 @@ impl AudioPlayer {
         // to work lol, so keep that in mind
         let source = Decoder::try_from(file).wrap_err("Failed to decode audio file")?;
 
-        self.player.stop();
+        self.player.clear();
         self.player.append(source);
-        self.player.play();
 
         self.current_track = Some(track.clone());
         self.mpris.set_track(Some(track));
+        self.sync_mpris_status();
+        Ok(())
+    }
+
+    pub fn play(&mut self, track: &Track) -> color_eyre::Result<()> {
+        self.load(track)?;
+        self.player.play();
         self.sync_mpris_status();
         Ok(())
     }
