@@ -48,6 +48,7 @@ pub struct LibraryWidget {
     pub widths: Vec<Constraint>,
     pub sort_key: Column,
     pub sort_direction: SortDirection,
+    tag_filters: Vec<String>, // tag keys in current search
     matcher: Matcher,
 }
 
@@ -74,6 +75,7 @@ impl Default for LibraryWidget {
             widths,
             sort_key,
             sort_direction: SortDirection::Ascending,
+            tag_filters: Vec::new(),
             matcher: Matcher::default(),
         }
     }
@@ -173,13 +175,19 @@ impl LibraryWidget {
                     .map(|t| (i, t))
             })
             .map(|(i, track)| {
-                let prefix = if playing == Some(track.path.as_path()) {
+                let indicator = if playing == Some(track.path.as_path()) {
                     indicator
                 } else {
                     ""
                 };
+                let number = if self.has_tag_filter("album") {
+                    track.tags.track_label()
+                } else {
+                    String::new()
+                };
+                let prefix = [indicator, &number].concat();
                 if visible_range.contains(&i) {
-                    track_to_row(track, &self.columns, &col_widths, prefix)
+                    track_to_row(track, &self.columns, &col_widths, &prefix)
                 } else {
                     // off-screen, we dont use marquee then
                     track_to_row(track, &self.columns, &fake_widths, "")
@@ -297,6 +305,8 @@ impl LibraryWidget {
             // return all tracks
             self.filtered_indices = (0..library.tracks.len()).collect();
             self.sort(library);
+
+            self.tag_filters.clear();
         } else {
             // separate tags (genre:xxx, artist:xxx, alum:xxx)
             let tokens = util::tokenize(query);
@@ -323,6 +333,11 @@ impl LibraryWidget {
                     _ => generic_terms.push(token.as_str()),
                 }
             }
+
+            self.tag_filters = tags
+                .iter()
+                .map(|(key, _)| key.to_string())
+                .collect();
 
             // this is everything except the tags
             let generic_query = generic_terms.join(" ");
@@ -387,6 +402,11 @@ impl LibraryWidget {
                 .into_iter()
                 .map(|(_, idx)| idx)
                 .collect();
+
+            // if search with only tags, use sort as the order, not how we get it from nucleo
+            if generic_pat.is_none() {
+                self.sort(library);
+            }
         }
 
         // Restore selection to same track if its still in the list
@@ -420,6 +440,18 @@ impl LibraryWidget {
     }
 
     pub fn sort(&mut self, library: &LibraryState) {
+        // sort album order first, so tracks of same album stay in disc/track order when sorting in
+        // context of an album for example
+        self.filtered_indices
+            .sort_by_cached_key(|&i| {
+                let tags = &library.tracks[i].tags;
+                (
+                    tags.album().to_lowercase(),
+                    tags.disc_number.unwrap_or(0),
+                    tags.track_number.unwrap_or(0),
+                )
+            });
+
         match self.sort_key {
             Column::Title => self
                 .filtered_indices
@@ -476,5 +508,11 @@ impl LibraryWidget {
         } else {
             self.state.select(Some(0));
         }
+    }
+
+    pub fn has_tag_filter(&self, key: &str) -> bool {
+        self.tag_filters
+            .iter()
+            .any(|k| k == key)
     }
 }

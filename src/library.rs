@@ -79,6 +79,19 @@ impl TrackTags {
         self.date.as_deref().unwrap_or("")
     }
 
+    /// Label like `1.04` for album views. Empty if no treack number
+    pub fn track_label(&self) -> String {
+        let disc = self.disc_number.filter(|&n| n > 0);
+        let track = self
+            .track_number
+            .filter(|&n| n > 0);
+        match (disc, track) {
+            (Some(disc), Some(track)) => format!("{disc}.{track:02} "),
+            (None, Some(track)) => format!("{track:02} "),
+            _ => String::new(),
+        }
+    }
+
     /// Returns a search haystack string, containing all searchable fields
     // We do not keep it in search memory, it has derived fields and is cheap to build so no
     // need to keep it in cache, although in future perhaps we could make it be in cache for
