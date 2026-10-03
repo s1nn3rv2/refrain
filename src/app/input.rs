@@ -105,6 +105,7 @@ impl App {
                 {
                     Some(LibraryAction::Play(idx)) => self.library_play(idx),
                     Some(LibraryAction::AddToQueue(idx)) => self.library_add_to_queue(idx),
+                    Some(LibraryAction::AddAllToQueue) => self.library_add_all_to_queue(),
                     Some(LibraryAction::PlayNext(idx)) => self.library_play_next(idx),
                     Some(LibraryAction::EditTags(idx)) => self.library_edit_tags(idx),
                     None => {},
@@ -117,6 +118,7 @@ impl App {
                 {
                     Some(QueueAction::Play(idx)) => self.queue_play(idx),
                     Some(QueueAction::Remove(idx)) => self.queue_remove(idx),
+                    Some(QueueAction::Clear) => self.queue_clear(),
                     Some(QueueAction::MoveTrackUp(idx)) => self.queue_move_track_up(idx),
                     Some(QueueAction::MoveTrackDown(idx)) => self.queue_move_track_down(idx),
                     None => {},

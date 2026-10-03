@@ -20,6 +20,7 @@ use crate::{
 pub enum QueueAction {
     Play(usize), // Play immediately
     Remove(usize),
+    Clear,
     MoveTrackUp(usize),
     MoveTrackDown(usize),
 }
@@ -160,6 +161,13 @@ impl QueueWidget {
                 .state
                 .selected()
                 .map(QueueAction::Play),
+            KeyCode::Char('d')
+                if key_event
+                    .modifiers
+                    .contains(KeyModifiers::CONTROL) =>
+            {
+                Some(QueueAction::Clear)
+            },
             KeyCode::Char('d') => self
                 .state
                 .selected()

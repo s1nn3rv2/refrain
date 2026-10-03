@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use lru::LruCache;
 use nucleo_matcher::{
     Matcher, Utf32Str,
@@ -37,6 +37,7 @@ pub enum SortDirection {
 pub enum LibraryAction {
     Play(usize), // track index in library.tracks
     AddToQueue(usize),
+    AddAllToQueue,
     PlayNext(usize),
     EditTags(usize),
 }
@@ -255,6 +256,13 @@ impl LibraryWidget {
             KeyCode::Char('l') | KeyCode::Enter => self
                 .selected_track_index()
                 .map(LibraryAction::Play),
+            KeyCode::Char('a')
+                if key_event
+                    .modifiers
+                    .contains(KeyModifiers::CONTROL) =>
+            {
+                Some(LibraryAction::AddAllToQueue)
+            },
             KeyCode::Char('a') => self
                 .selected_track_index()
                 .map(LibraryAction::AddToQueue),

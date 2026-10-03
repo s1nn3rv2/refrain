@@ -52,8 +52,10 @@ Built with Rust and Ratatui.
 |:---|:---|:---|
 | `a` | Library | Add selected track to queue |
 | `A` | Library | Play selected track next (top of queue) |
+| `Ctrl + a` | Library | Add all tracks from current search to queue |
 | `Enter` / `l` | Queue | Play selected queued track |
 | `d` | Queue | Remove selected track from queue |
+| `Ctrl + d` | Queue | Clear the queue |
 | `K` / `Shift + Up` | Queue | Move selected track up |
 | `J` / `Shift + Down` | Queue | Move selected track down |
 

@@ -80,6 +80,35 @@ impl App {
         }
     }
 
+    pub fn library_add_all_to_queue(&mut self) {
+        let mut tracks = self
+            .library_widget
+            .filtered_indices
+            .iter()
+            .filter_map(|&idx| {
+                self.library
+                    .tracks
+                    .get(idx)
+                    .cloned()
+            })
+            .collect::<Vec<Track>>()
+            .into_iter();
+
+        if self
+            .player
+            .current_track()
+            .is_none()
+            && let Some(first) = tracks.next()
+        {
+            self.play_track(first);
+        }
+
+        self.queue
+            .user_queue
+            .extend(tracks);
+        self.sync_mpris_queue_state();
+    }
+
     pub fn library_play_next(&mut self, idx: usize) {
         if let Some(track) = self
             .library
@@ -129,6 +158,14 @@ impl App {
                 .state
                 .select(Some(len - 1));
         }
+    }
+
+    pub fn queue_clear(&mut self) {
+        self.queue.user_queue.clear();
+        self.queue_widget
+            .state
+            .select(None);
+        self.sync_mpris_queue_state();
     }
 
     pub fn queue_move_track_up(&mut self, idx: usize) {
