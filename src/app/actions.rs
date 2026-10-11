@@ -1,6 +1,8 @@
 use std::time::Duration;
 
-use crate::{app::App, library::Track, mpris::MprisAction, ui::tag_editor::TagEditor};
+use crate::{
+    app::App, library::Track, mpris::MprisAction, queue::ShuffleMode, ui::tag_editor::TagEditor,
+};
 
 impl App {
     pub fn handle_mpris(&mut self, action: MprisAction) {
@@ -45,6 +47,15 @@ impl App {
                     let _ = self.player.seek(position);
                 }
             },
+            MprisAction::SetShuffle(on) => {
+                let mode = match (on, self.queue.mode) {
+                    (false, _) => ShuffleMode::Off,
+                    (true, ShuffleMode::Off) => ShuffleMode::Shuffle,
+                    (true, mode) => mode,
+                };
+                self.queue.set_mode(mode);
+                self.sync_mpris_queue_state();
+            },
             MprisAction::Quit => self.exit(),
         }
     }
@@ -56,7 +67,17 @@ impl App {
             .get(idx)
             .cloned()
         {
+            // take a snapshot of the library for shuffle
+            let pos = self
+                .library_widget
+                .filtered_indices
+                .iter()
+                .position(|&i| i == idx)
+                .unwrap_or(0);
+            self.queue
+                .set_context(self.visible_tracks(), pos);
             self.play_track(track);
+            self.sync_mpris_queue_state();
         }
     }
 
@@ -81,18 +102,7 @@ impl App {
     }
 
     pub fn library_add_all_to_queue(&mut self) {
-        let mut tracks = self
-            .library_widget
-            .filtered_indices
-            .iter()
-            .filter_map(|&idx| {
-                self.library
-                    .tracks
-                    .get(idx)
-                    .cloned()
-            })
-            .collect::<Vec<Track>>()
-            .into_iter();
+        let mut tracks = self.visible_tracks().into_iter();
 
         if self
             .player
@@ -225,7 +235,10 @@ impl App {
     }
 
     pub fn play_next_track(&mut self) {
-        if let Some(next_track) = self.queue.pop_next() {
+        if let Some(next_track) = self
+            .queue
+            .pop_next(&self.library.tracks)
+        {
             self.play_track(next_track);
         } else {
             self.stop();
@@ -250,10 +263,19 @@ impl App {
         }
     }
 
+    pub fn cycle_shuffle_mode(&mut self) {
+        self.queue
+            .set_mode(self.queue.mode.next());
+        self.sync_mpris_queue_state();
+    }
+
     pub fn sync_mpris_queue_state(&self) {
-        let has_next = !self.queue.user_queue.is_empty();
+        self.player.sync_mpris_can_go_next(
+            self.queue
+                .has_next(&self.library.tracks),
+        );
         self.player
-            .sync_mpris_can_go_next(has_next);
+            .sync_mpris_shuffle(self.queue.mode != ShuffleMode::Off);
     }
 
     pub fn refresh_filter(&mut self) {
@@ -265,5 +287,18 @@ impl App {
                 .library_widget
                 .filtered_indices,
         );
+    }
+
+    pub fn visible_tracks(&self) -> Vec<Track> {
+        self.library_widget
+            .filtered_indices
+            .iter()
+            .filter_map(|&idx| {
+                self.library
+                    .tracks
+                    .get(idx)
+                    .cloned()
+            })
+            .collect()
     }
 }

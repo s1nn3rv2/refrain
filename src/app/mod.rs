@@ -239,6 +239,7 @@ impl App {
 
         self.transport.render(
             &self.player,
+            self.queue.mode,
             self.waveform.as_ref(),
             self.cover.as_ref(),
             transport_area,

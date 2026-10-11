@@ -7,8 +7,8 @@ use ratatui::{
 use ratatui_image::{Image, protocol::Protocol};
 
 use crate::{
-    audio::AudioPlayer, task::COVER_SIZE, ui::waveform::WaveformWidget, util::DurationExt,
-    waveform::WaveformData,
+    audio::AudioPlayer, queue::ShuffleMode, task::COVER_SIZE, ui::waveform::WaveformWidget,
+    util::DurationExt, waveform::WaveformData,
 };
 
 pub enum TransportAction {
@@ -24,6 +24,7 @@ impl TransportState {
     pub fn render(
         &mut self,
         player: &AudioPlayer,
+        shuffle: ShuffleMode,
         waveform: Option<&WaveformData>,
         cover: Option<&Protocol>,
         area: Rect,
@@ -79,7 +80,15 @@ impl TransportState {
             None => WaveformWidget::empty().render(waveform_area, buf),
         }
 
+        let label = shuffle.label();
+        let [time_area, mode_area] =
+            Layout::horizontal([Constraint::Fill(1), Constraint::Length(label.len() as u16)])
+                .areas(time_area);
+
         Paragraph::new(time_display).render(time_area, buf);
+        Paragraph::new(label)
+            .right_aligned()
+            .render(mode_area, buf);
     }
 
     // TODO: add debouncing to seeking (update UI state but don't constantly seek on drag, that lags)

@@ -69,6 +69,7 @@ impl App {
                 self.play_next_track();
             },
             KeyCode::Char('u') => self.show_queue = !self.show_queue,
+            KeyCode::Char('z') => self.cycle_shuffle_mode(),
             KeyCode::Char('/') => {
                 self.search.input.focus();
                 return;

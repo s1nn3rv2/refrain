@@ -26,6 +26,7 @@ impl App {
             sort_direction: Some(self.library_widget.sort_direction),
             show_queue: Some(self.show_queue),
             active_view: Some(self.active_view),
+            shuffle_mode: Some(self.queue.mode),
         }
     }
 
@@ -82,6 +83,10 @@ impl App {
         if let Some(idx) = selected {
             self.library_widget
                 .select_track(idx);
+        }
+
+        if let Some(mode) = state.shuffle_mode {
+            self.queue.mode = mode;
         }
 
         self.queue

@@ -13,6 +13,7 @@ pub enum MprisAction {
     Quit,
     Seek(i64),
     SetPosition(Duration),
+    SetShuffle(bool),
 }
 
 enum MprisUpdate {
@@ -21,6 +22,7 @@ enum MprisUpdate {
     Position(Duration),
     Seeked(Duration),
     CanGoNext(bool),
+    Shuffle(bool),
 }
 
 pub struct MprisManager {
@@ -42,7 +44,7 @@ impl MprisManager {
                     .can_seek(true)
                     .can_go_next(false)
                     .can_go_previous(false) // not yet added
-                    .shuffle(false) // disable shuffle and loop for now until its added
+                    .shuffle(false)
                     .loop_status(mpris_server::LoopStatus::None)
                     .build()
                     .await
@@ -84,6 +86,11 @@ impl MprisManager {
                 let tx = events_tx.clone();
                 player.connect_seek(move |_, offset| {
                     let _ = tx.send(AppEvent::Mpris(MprisAction::Seek(offset.as_micros())));
+                });
+
+                let tx = events_tx.clone();
+                player.connect_set_shuffle(move |_, shuffle| {
+                    let _ = tx.send(AppEvent::Mpris(MprisAction::SetShuffle(shuffle)));
                 });
 
                 let tx = events_tx.clone();
@@ -168,6 +175,9 @@ impl MprisManager {
                                     .set_can_go_next(can_go_next)
                                     .await;
                             },
+                            MprisUpdate::Shuffle(shuffle) => {
+                                let _ = player.set_shuffle(shuffle).await;
+                            },
                         }
                     }
                 })
@@ -206,5 +216,11 @@ impl MprisManager {
         let _ = self
             .update_tx
             .send_blocking(MprisUpdate::CanGoNext(can_go_next));
+    }
+
+    pub fn set_shuffle(&self, shuffle: bool) {
+        let _ = self
+            .update_tx
+            .send_blocking(MprisUpdate::Shuffle(shuffle));
     }
 }

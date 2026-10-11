@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use crate::task::THUMB_SIZE;
 
 // TODO: implement hot-reload
-//
 static CONFIG: OnceLock<Config> = OnceLock::new();
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]

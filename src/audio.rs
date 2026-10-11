@@ -125,4 +125,8 @@ impl AudioPlayer {
         self.mpris
             .set_can_go_next(can_go_next);
     }
+
+    pub fn sync_mpris_shuffle(&self, shuffle: bool) {
+        self.mpris.set_shuffle(shuffle);
+    }
 }

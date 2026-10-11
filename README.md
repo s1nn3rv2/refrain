@@ -21,7 +21,7 @@ Built with Rust and Ratatui.
 - [x] Tag editing - allows you to edit tags on songs
 - [x] MPRIS support - allows you to control and see the current song in your system's media player 
 - [x] Queue management - add tracks, play next, view and manage via collapsible drawer
-- [ ] Context-aware shuffle - knows your context, whether you're in an album, genre or everything, it knows what songs to pick from
+- [x] Context-aware shuffle - knows your context, whether you're in an album, genre or everything, it knows what songs to pick
 - [ ] Synced lyrics - automatically fetches and scrolls lyrics 
 - [ ] Gapless playback - seamless track transitions
 - [ ] Extensible config support - allows you to adjust the player to your liking 
@@ -39,12 +39,22 @@ Built with Rust and Ratatui.
 | `p` | Play / Pause |
 | `n` / `>` | Next track |
 | `u` | Toggle queue drawer open / closed |
+| `z` | Cycle shuffle mode (off, shuffle, random, random (all)) |
 | `s` | Cycle sort column |
 | `S` | Toggle sort direction (ascending/descending) |
 | `/` | Open fuzzy search |
 | `r` | Rescan `~/Music` directory |
 | `Esc` / `Enter` | Exit search mode |
 | `q` | Quit |
+
+### Shuffle modes
+
+| Mode | What plays next |
+|:---|:---|
+| shuffle off | The next track in order |
+| shuffle | Every track in the list once, in random order |
+| random | A random track from the list each time (tracks can repeat) |
+| random (all) | A random track from your whole library (ignores the filtered list) |
 
 ### Queue Actions
 

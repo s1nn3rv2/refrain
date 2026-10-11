@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 
-use crate::{app::ActiveView, config::Column, ui::library::SortDirection};
+use crate::{app::ActiveView, config::Column, queue::ShuffleMode, ui::library::SortDirection};
 
 // if app ever gets big, should probably use separate states for different elements of the app
 // instead of one like this
@@ -18,6 +18,7 @@ pub struct State {
     pub sort_direction: Option<SortDirection>,
     pub show_queue: Option<bool>,
     pub active_view: Option<ActiveView>,
+    pub shuffle_mode: Option<ShuffleMode>,
 }
 
 impl State {
