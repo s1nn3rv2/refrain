@@ -136,7 +136,7 @@ impl LibraryWidget {
         };
 
         let block = Block::bordered()
-            .title(" Library ")
+            .title(format!(" Library ({})", self.filtered_indices.len()))
             .border_set(border::THICK)
             .padding(Padding::horizontal(1))
             .border_style(border_style);
