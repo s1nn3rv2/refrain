@@ -34,6 +34,8 @@ Built with Rust and Ratatui.
 |:---|:---|
 | `j` / `Down` | Move down |
 | `k` / `Up` | Move up |
+| `g` | Go to top |
+| `G` | Go to bottom |
 | `Tab` / `Shift + Tab` | Cycle focus between panes (Sidebar, Library, Queue) |
 | `Enter` / `l` | Play selected track |
 | `p` | Play / Pause |

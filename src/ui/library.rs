@@ -253,6 +253,14 @@ impl LibraryWidget {
                 self.prev();
                 None
             },
+            KeyCode::Char('g') | KeyCode::Home => {
+                self.state.select_first();
+                None
+            },
+            KeyCode::Char('G') | KeyCode::End => {
+                self.state.select_last();
+                None
+            },
             KeyCode::Char('l') | KeyCode::Enter => self
                 .selected_track_index()
                 .map(LibraryAction::Play),
