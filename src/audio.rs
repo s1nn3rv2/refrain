@@ -10,6 +10,7 @@ pub struct AudioPlayer {
     _device_sink: MixerDeviceSink,
     player: Player,
     current_track: Option<Track>,
+    next: Option<Track>, // appended to rodio, but not playing yet
     mpris: MprisManager,
 }
 
@@ -24,6 +25,7 @@ impl AudioPlayer {
             _device_sink: device_sink,
             player,
             current_track: None,
+            next: None,
             mpris: MprisManager::new(events_tx),
         })
     }
@@ -37,6 +39,7 @@ impl AudioPlayer {
         let source = Decoder::try_from(file).wrap_err("Failed to decode audio file")?;
 
         self.player.clear();
+        self.next = None;
         self.player.append(source);
 
         self.current_track = Some(track.clone());
@@ -90,6 +93,7 @@ impl AudioPlayer {
 
     pub fn stop(&mut self) {
         self.player.stop();
+        self.next = None;
         self.current_track = None;
         self.mpris.set_track(None);
         self.mpris
@@ -103,6 +107,47 @@ impl AudioPlayer {
             self.current_track = Some(track.clone());
             self.mpris.set_track(Some(track));
         }
+    }
+
+    // only preload at last 5 seconds of the song ending
+    pub fn needs_preload(&self) -> bool {
+        let Some(track) = &self.current_track else {
+            return false;
+        };
+        self.next.is_none()
+            && track
+                .length
+                .saturating_sub(self.elapsed())
+                < Duration::from_secs(5)
+    }
+
+    // this is used for gapless playback, rodio already supports it if you append
+    pub fn preload(&mut self, track: &Track) -> color_eyre::Result<()> {
+        let file = File::open(&track.path)
+            .wrap_err_with(|| format!("Failed to open file: {:?}", track.path))?;
+        let source = Decoder::try_from(file).wrap_err("Failed to decode audio file")?;
+        self.player.append(source);
+        self.next = Some(track.clone());
+        Ok(())
+    }
+
+    pub fn poll_transition(&mut self) -> bool {
+        if self.next.is_none() || self.player.len() != 1 {
+            return false;
+        }
+        self.current_track = self.next.take();
+        self.mpris
+            .set_track(self.current_track.as_ref());
+        self.sync_mpris_status();
+        true
+    }
+
+    pub fn take_next(&mut self) -> Option<Track> {
+        self.next.take()
+    }
+
+    pub fn has_next(&self) -> bool {
+        self.next.is_some()
     }
 
     fn sync_mpris_status(&self) {

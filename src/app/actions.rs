@@ -235,10 +235,14 @@ impl App {
     }
 
     pub fn play_next_track(&mut self) {
-        if let Some(next_track) = self
-            .queue
-            .pop_next(&self.library.tracks)
-        {
+        let next = self
+            .player
+            .take_next()
+            .or_else(|| {
+                self.queue
+                    .pop_next(&self.library.tracks)
+            });
+        if let Some(next_track) = next {
             self.play_track(next_track);
         } else {
             self.stop();
@@ -258,8 +262,22 @@ impl App {
     }
 
     pub fn check_track_finished(&mut self) {
-        if self.player.is_finished() {
+        if self.player.poll_transition() {
+            self.waveform = None;
+            self.cover = None;
+            if let Some(track) = self.player.current_track() {
+                self.tasks.set_track(&track.path);
+            }
+            self.sync_mpris_queue_state();
+        } else if self.player.is_finished() {
             self.play_next_track();
+        } else if self.player.needs_preload()
+            && let Some(track) = self
+                .queue
+                .pop_next(&self.library.tracks)
+        {
+            let _ = self.player.preload(&track);
+            self.sync_mpris_queue_state();
         }
     }
 
@@ -272,7 +290,8 @@ impl App {
     pub fn sync_mpris_queue_state(&self) {
         self.player.sync_mpris_can_go_next(
             self.queue
-                .has_next(&self.library.tracks),
+                .has_next(&self.library.tracks)
+                || self.player.has_next(),
         );
         self.player
             .sync_mpris_shuffle(self.queue.mode != ShuffleMode::Off);
