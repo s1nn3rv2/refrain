@@ -1,4 +1,4 @@
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, MouseEvent, MouseEventKind};
 
 use crate::{
     app::{ActiveView, App},
@@ -13,6 +13,18 @@ impl App {
         match event {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 self.handle_key_event(key_event);
+            },
+            Event::Mouse(MouseEvent {
+                kind: MouseEventKind::ScrollDown,
+                ..
+            }) => {
+                self.handle_key_event(KeyCode::Down.into());
+            },
+            Event::Mouse(MouseEvent {
+                kind: MouseEventKind::ScrollUp,
+                ..
+            }) => {
+                self.handle_key_event(KeyCode::Up.into());
             },
             Event::Mouse(mouse_event)
                 if let Some(TransportAction::Seek(progress)) = self
